@@ -7,6 +7,9 @@
   inputs,
   ...
 }:
+let
+  tools = import ../nix/tools.nix { inherit pkgs; };
+in
 {
   nixpkgs.overlays = [
     (final: prev: {
@@ -14,13 +17,18 @@
         patches = (old.patches or [ ]) ++ [ ../patches/calamares-flake-install.patch ];
         postPatch = (old.postPatch or "") + ''
           substituteInPlace modules/nixos/main.py \
-            --replace-fail '@prepareTarget@' '${../calamares/prepare_target.py}'
+            --replace-fail '@prepareTarget@' '${tools}/bin/respin-tools'
         '';
       });
     })
   ];
 
-  environment.systemPackages = [ inputs.fh.packages.${pkgs.stdenv.hostPlatform.system}.default ];
+  environment.systemPackages = [
+    inputs.fh.packages.${pkgs.stdenv.hostPlatform.system}.default
+    # Precompiled from the same Rust implementation as the script entry points.
+    # This avoids compilation or registry access in the live installer.
+    tools
+  ];
   networking.wireless.enable = lib.mkForce false;
   networking.networkmanager.enable = true;
 

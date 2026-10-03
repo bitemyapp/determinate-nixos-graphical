@@ -18,6 +18,7 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      tools = import ./nix/tools.nix { inherit pkgs; };
       installer = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
@@ -34,35 +35,23 @@
         default = self.packages.${system}.iso;
         iso = installer.config.system.build.isoImage;
         calamares-extensions = installer.pkgs.calamares-nixos-extensions;
+        inherit tools;
       };
       checks.${system} = {
-        generate-config =
-          pkgs.runCommand "generate-config-tests" { nativeBuildInputs = [ pkgs.python3 ]; }
-            ''
-              mkdir -p "$TMPDIR/target"
-              ${installer.config.system.build.nixos-generate-config}/bin/nixos-generate-config \
-                --root "$TMPDIR/target" --no-filesystems --flake
-              python - "$TMPDIR/target/etc/nixos/flake.nix" ${./templates/flake.nix.in} <<'PY'
-              import pathlib, sys
-              actual = pathlib.Path(sys.argv[1]).read_text()
-              expected = pathlib.Path(sys.argv[2]).read_text().replace("@HOSTNAME@", '"nixos"')
-              assert actual.rstrip() == expected.rstrip(), actual
-              PY
-              touch $out
-            '';
-        calamares-handoff =
-          pkgs.runCommand "calamares-handoff-tests"
-            {
-              nativeBuildInputs = [ pkgs.python3 ];
-            }
-            ''
-              export PYTHONDONTWRITEBYTECODE=1
-              python ${./tests/test_handoff.py} \
-                ${./calamares/prepare_target.py} \
-                ${./templates/flake.nix.in} ${./flake.lock} \
-                ${installer.pkgs.calamares-nixos-extensions}/lib/calamares/modules/nixos/main.py
-              touch $out
-            '';
+        generate-config = pkgs.runCommand "generate-config-tests" { } ''
+          mkdir -p "$TMPDIR/target"
+          ${installer.config.system.build.nixos-generate-config}/bin/nixos-generate-config \
+            --root "$TMPDIR/target" --no-filesystems --flake
+          ${tools}/bin/respin-tools check-config generated \
+            "$TMPDIR/target/etc/nixos/flake.nix" ${./templates/flake.nix.in}
+          touch $out
+        '';
+        calamares-handoff = pkgs.runCommand "calamares-handoff-tests" { } ''
+          ${tools}/bin/respin-tools test-handoff \
+            ${./templates/flake.nix.in} ${./flake.lock} \
+            ${installer.pkgs.calamares-nixos-extensions}/lib/calamares/modules/nixos/main.py
+          touch $out
+        '';
         kernel-defaults =
           let
             lts =
@@ -72,15 +61,8 @@
               pkgs.writeText "latest-defaults.ini"
                 installer.config.specialisation.latest_kernel.configuration.environment.etc."nixos-generate-config.conf".text;
           in
-          pkgs.runCommand "kernel-defaults-tests" { nativeBuildInputs = [ pkgs.python3 ]; } ''
-            python - ${lts} ${latest} <<'PY'
-            import configparser, sys
-            for path, kernel in zip(sys.argv[1:], ["lts", "latest"]):
-                config = configparser.ConfigParser()
-                config.read(path)
-                assert config["Defaults"]["Flake"] == "1"
-                assert config["Defaults"]["Kernel"] == kernel
-            PY
+          pkgs.runCommand "kernel-defaults-tests" { } ''
+            ${tools}/bin/respin-tools check-config defaults ${lts} ${latest}
             touch $out
           '';
       };

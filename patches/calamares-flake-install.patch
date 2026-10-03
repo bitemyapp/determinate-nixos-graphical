@@ -1,16 +1,18 @@
 --- a/modules/nixos/main.py
 +++ b/modules/nixos/main.py
-@@ -1055,6 +1055,20 @@
+@@ -1055,6 +1055,22 @@
      except subprocess.CalledProcessError as e:
          libcalamares.utils.warning("Failed to set permissions on {}: {}".format(root_mount_point, e.output))
  
 +    # Unofficial Determinate respin: preserve the GUI-generated configuration,
 +    # seed the tested input lock, and select this flake explicitly. Upstream
 +    # nixos-install otherwise falls back to the legacy configuration.nix path.
-+    import runpy
 +    try:
-+        prepare_target = runpy.run_path("@prepareTarget@")['prepare_target']
-+        target_flake = prepare_target(root_mount_point, gs.value("hostname"))
++        target_flake = subprocess.check_output(
++            ["@prepareTarget@", "prepare-target", root_mount_point,
++             gs.value("hostname") or "nixos"],
++            text=True,
++        ).strip()
 +    except Exception as e:
 +        libcalamares.utils.error(str(e))
 +        return (
@@ -21,7 +23,7 @@
      # build nixos-install command
      nixosInstallCmd = [ "pkexec" ]
      nixosInstallCmd.extend(generateProxyStrings())
-@@ -1065,6 +1079,8 @@
+@@ -1065,6 +1081,8 @@
              "--no-root-passwd",
              "--root",
              root_mount_point,

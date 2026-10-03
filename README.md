@@ -7,7 +7,7 @@ partitioning, locale, user and bootloader choices remain available. Both the liv
 system and the installed system use Determinate Nix, Determinate Nixd and `fh`.
 Flakes are enabled by Determinate's NixOS module.
 
-![The actual respin running the official Calamares frontend in QEMU](docs/images/live-installer.png)
+![The Rust-backed respin running the official Calamares frontend in QEMU](docs/images/rust-live-installer.png)
 
 The boot menu provides Plasma with either the LTS kernel or the newer kernel,
 as in Determinate's minimal combined ISO. Calamares retains that kernel choice
@@ -69,19 +69,29 @@ log into FlakeHub to build the public configuration.
 
 ## Build without installing Nix on the host
 
-Requirements: Linux x86_64, QEMU with KVM, `bsdtar`, OpenSSH, Python 3.11+, access
+Requirements: Linux x86_64, QEMU with KVM, `bsdtar`, OpenSSH, Rust/Cargo,
+[`rust-script`](https://rust-script.org/), access
 to `/dev/kvm`, about 16 GiB available RAM and 40 GiB free disk space. The sparse
 builder disk has a maximum size of 100 GiB. Builds can download several GiB.
 
 ```sh
-python3 scripts/build_rootless.py /path/to/nixos-with-determinate.iso
+cargo install rust-script --version 0.36.0 --locked
+rustup target add x86_64-unknown-linux-musl
+rust-script --force scripts/build_rootless.rs /path/to/nixos-with-determinate.iso
 ```
 
 The script checks the SHA-256 of the original Determinate ISO used for this
 respin, starts a disposable builder VM, builds with its existing Determinate Nix,
-and copies the output ISO into `artifacts/`. It needs **no host sudo**. Its reusable
+and copies the output ISO into `artifacts/rust-script/`. It needs **no host sudo**. Its reusable
 Nix store is in `.work/rootless/builder.raw`; it never attaches a host block
-device. Detailed output is saved in `artifacts/build.log`.
+device. Detailed output is saved in `artifacts/rust-script/build.log`. The Rust
+builder exports the ISO atomically and writes its SHA-256 sidecar; it does not
+overwrite the original pre-migration ISO in `artifacts/`.
+
+The guest bootstrap is a statically linked Rust executable, built on the host
+from the same sources. No Rust compiler or Cargo registry access is needed in
+the bootstrap VM or live installer. The downloaded bootstrap ISO and all flake
+inputs remain unchanged.
 
 For another bootstrap ISO, supply `--sha256` with a separately verified hash.
 That changes only the build environment; the repository's lock still determines
@@ -95,9 +105,9 @@ firmware. They do not use direct kernel boot or present the ISO as a CD to claim
 USB bootability.
 
 ```sh
-python3 scripts/qemu_test.py artifacts/NAME.iso --firmware bios
-python3 scripts/qemu_test.py artifacts/NAME.iso --firmware uefi
-python3 scripts/qemu_test.py artifacts/NAME.iso --firmware uefi --install
+rust-script --force scripts/qemu_test.rs artifacts/rust-script/NAME.iso --firmware bios
+rust-script --force scripts/qemu_test.rs artifacts/rust-script/NAME.iso --firmware uefi
+rust-script --force scripts/qemu_test.rs artifacts/rust-script/NAME.iso --firmware uefi --install
 ```
 
 UEFI tests require OVMF. The defaults match Arch/CachyOS's `edk2-ovmf` paths;
@@ -116,11 +126,46 @@ If a test was interrupted **after** its log recorded `CALAMARES_INSTALL_PASS`,
 the installed disk can be verified without reinstalling:
 
 ```sh
-python3 scripts/boot_installed.py RUN-NAME
+rust-script --force scripts/boot_installed.rs RUN-NAME
 ```
 
 This accepts only a completed installation run from `artifacts/` and `.work/`,
 uses its original virtual disk and firmware variables, and attaches no ISO.
+
+## RustScript implementation and development
+
+All first-party executable scripts are `.rs` files with a `rust-script` shebang
+and embedded Cargo manifest. They share the implementation in `rust/`; they do
+not launch the old Python or shell scripts. `rust/Cargo.lock` pins the production
+tool's dependencies, and the Nix build compiles with that lock without network
+access in its build sandbox. `rust-script` maintains its own Cargo cache for the
+developer entry points; use the locked Cargo/Nix build for release validation.
+Use `--force` when invoking `rust-script` explicitly: its script cache does not
+notice changes to this shared local dependency on its own. All entry-point
+shebangs include `--force`, so direct execution (for example,
+`./scripts/qemu_test.rs ...`) automatically asks Cargo to check for changes.
+Cargo still reuses unchanged compiled dependencies.
+
+The ISO includes the precompiled Rust installer helper and test driver. The
+upstream Calamares job remains Python: the small upstream patch invokes the
+Rust helper, and the integration test supplies Rust callbacks through PyO3 to
+the real Calamares module. No Python test fixture is embedded or generated.
+Nix derivation commands and short SSH/serial/guest-agent command strings still
+use the shell where those interfaces require it.
+
+```sh
+cargo test --manifest-path rust/Cargo.toml --locked
+cargo test --manifest-path rust/Cargo.toml --locked --features calamares
+cargo clippy --manifest-path rust/Cargo.toml --all-targets --features calamares -- -D warnings
+cargo fmt --manifest-path rust/Cargo.toml --check
+rust-script --force tests/process_cleanup.rs
+```
+
+The `calamares` feature requires CPython development libraries on the developer
+machine. They are provided by Nix for the packaged tools; host-side rootless
+building and VM orchestration do not require host Python. RustScript entry
+points also support `--help`; guest-only commands retain disk-serial, size,
+filesystem and privilege checks before any partitioning or formatting.
 
 ## After installation
 
@@ -148,8 +193,10 @@ compatibility setting generated by Calamares; do not change it just to upgrade.
 - `flake.nix`, `flake.lock`: image definition and exact upstream revisions.
 - `modules/installer.nix`: live installer integration.
 - `templates/flake.nix.in`: installed system's flake template.
-- `calamares/prepare_target.py`, `patches/`: the installation handoff.
-- `tests/`, `scripts/`: regression tests, rootless builder and firmware tests.
+- `calamares/prepare_target.rs`, `patches/`: the installation handoff.
+- `tests/`, `scripts/`: executable RustScript entry points.
+- `rust/`: shared Rust implementation, unit tests and locked dependencies.
+- `nix/tools.nix`: the offline-built native installer helper and test driver.
 - `TESTING.md`: recorded results and verification limits.
 
 `.work/`, `artifacts/`, virtual disks, generated SSH keys, logs and ISOs are
