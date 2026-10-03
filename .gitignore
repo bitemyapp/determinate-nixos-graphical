@@ -1,0 +1,5 @@
+/.work/
+/artifacts/
+/result*
+__pycache__/
+*.pyc

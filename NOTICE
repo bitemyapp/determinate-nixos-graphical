@@ -1,0 +1,19 @@
+Unofficial NixOS graphical installer with Determinate Nix
+
+The flake inputs, lock file and Determinate integration are adapted from:
+  DeterminateSystems/nixos-iso
+  https://github.com/DeterminateSystems/nixos-iso
+  revision 72a5c3aaddbd58b339a76bc4e98945d9ff981b1e
+  Copyright 2025 Determinate Systems, Inc. (Apache-2.0)
+
+Changes replace the minimal live environment with the official NixOS Plasma
+Calamares installer, preserve the pinned Determinate configuration when
+installing, and add rootless build and QEMU verification tools.
+
+The build imports NixOS/nixpkgs and its Calamares extensions; their original
+licenses and attribution remain in their upstream sources and Nix store paths.
+The Calamares extension patch applies to the MIT-licensed upstream source.
+
+This community respin is not an official release of NixOS or Determinate
+Systems. Names and existing upstream artwork identify the software included;
+they do not imply endorsement. Bundled software retains its own licenses.
