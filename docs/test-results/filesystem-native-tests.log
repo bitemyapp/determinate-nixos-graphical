@@ -63,4 +63,3 @@ test src/plan.rs - plan::ConfirmedInstall (line 265) - compile fail ... ok
 test src/wifi.rs - wifi::WifiTransfer (line 29) - compile fail ... ok
 
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
-
