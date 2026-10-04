@@ -1,60 +1,58 @@
 # NixOS graphical installer with Determinate Nix
 
-An **unofficial** respin of [Determinate Systems' NixOS ISO](https://github.com/DeterminateSystems/nixos-iso), using the [official NixOS Plasma/Calamares installer](https://github.com/NixOS/nixpkgs/blob/c59305bab2065cfecc4944690d9eedbb56f3a9fa/nixos/modules/installer/cd-dvd/installation-cd-graphical-calamares-plasma6.nix).
+An unofficial, x86_64 NixOS live ISO with KDE Plasma, Determinate Nix and a
+[NixOS-focused Rust/GTK4 Calamares fork](https://github.com/bitemyapp/calamares/tree/codex/nixos-rust).
+It uses the official NixOS graphical base, but **not** the upstream C++/Python
+Calamares engine. It is not endorsed by NixOS, Calamares or Determinate Systems.
 
-The live system boots into KDE Plasma and starts Calamares. Its normal desktop,
-partitioning, locale, user and bootloader choices remain available. Both the live
-system and the installed system use Determinate Nix, Determinate Nixd and `fh`.
-Flakes are enabled by Determinate's NixOS module.
+![The native Rust installer on the live ISO](docs/images/native-live-installer.png)
 
-![The Rust-backed respin running the official Calamares frontend in QEMU](docs/images/rust-live-installer.png)
+## Supported workflow
 
-The boot menu provides Plasma with either the LTS kernel or the newer kernel,
-as in Determinate's minimal combined ISO. Calamares retains that kernel choice
-in the installed configuration.
+The native installer supports guided **whole-disk erase**, GPT/ext4, UEFI with
+systemd-boot or legacy BIOS with GRUB, and an installed Plasma desktop.
+You choose the hostname, normal user, password, full name, timezone, one of
+eight locales/keyboards, and whether to allow unfree packages.
 
-This is a community project, not an official release or endorsement from NixOS
-or Determinate Systems. This first version supports **x86_64 Linux** and retains
-the rolling NixOS revision used by the source Determinate ISO, rather than
-silently switching it to another NixOS release.
+This experimental first release does **not** support manual partitioning,
+preserving another OS, encryption, RAID/LVM, Btrfs, offline installation,
+other desktop choices, translated UI or upstream Calamares plugins.
+Network access is required. Back up data before using it on a real disk.
+See [TESTING.md](TESTING.md) for the tested scenarios and their limits.
 
-## Pinned inputs
+Both the live and installed systems use Determinate Nix, Determinate Nixd and
+`fh`. The boot menu offers an LTS kernel and a latest-kernel specialisation;
+the native installer carries that choice into its target configuration.
 
-The input lock is copied from DeterminateSystems/nixos-iso revision
-`72a5c3aaddbd58b339a76bc4e98945d9ff981b1e`.
+## Locked sources and clean integration
 
-| Component | Pinned version |
+The three-input system lock comes unchanged from DeterminateSystems/nixos-iso
+revision `72a5c3aaddbd58b339a76bc4e98945d9ff981b1e`:
+
+| Component | Revision/version |
 | --- | --- |
-| NixOS/nixpkgs | `c59305bab2065cfecc4944690d9eedbb56f3a9fa` (26.11 rolling, 2026-10-01) |
-| Determinate | 3.23.0 (`68e51a34285ceb664e74d078bcd46a15f984dfe4`) |
-| FlakeHub CLI | 0.1.27 (`4f001f2e1de4776f01cf22d1de815f1016a4c4c9`) |
-| Calamares / NixOS extensions | 3.4.2 / 0.3.23, from the pinned nixpkgs |
+| Nixpkgs | `c59305bab2065cfecc4944690d9eedbb56f3a9fa` (26.11 rolling) |
+| Determinate | 3.23.0, `68e51a34285ceb664e74d078bcd46a15f984dfe4` |
+| FlakeHub CLI | 0.1.27, `4f001f2e1de4776f01cf22d1de815f1016a4c4c9` |
+| Rust installer | Exact Git revision and content hash in [nix/calamares-source.json](nix/calamares-source.json) |
 
-## Why a Calamares patch is needed
+The installer is fetched separately so it does not add a fourth input to the
+installed machine's lock. It writes the hostname-keyed flake, copies the lock
+verbatim, generates hardware configuration with the normal NixOS tool, and calls
+`nixos-install --flake` explicitly. There is no Python patch, PyO3 bridge,
+Calamares global-storage hook, Perl flake override or duplicate INI defaults.
 
-Determinate's minimal ISO customizes `nixos-generate-config` to generate a flake
-that imports its NixOS module. At the pinned revision, Calamares then calls
-`nixos-install` without `--flake`. NixOS explicitly avoids automatically selecting
-a flake because it does not know which configuration name to use. Merely adding
-the graphical ISO module would therefore leave Determinate out of the installed
-system.
+One root-owned JSON file configures the live installer. The GUI is unprivileged;
+all expensive work runs on workers or in its Rust helper. Authorization uses
+NixOS's Polkit wrapper and an exact-helper policy. The live session grants only
+that installer action to the active local `nixos` user, not blanket Polkit access.
+No installer configuration, live user, autologin or live permission rules are
+imported into the installed system. Password hashes stay in a root-only runtime
+file outside the flake source, never in the Nix store.
 
-Our small patch keeps Calamares's generated `configuration.nix` and hardware
-configuration, writes a target `flake.nix` keyed by the GUI-selected hostname,
-copies the ISO's `flake.lock`, and explicitly selects that configuration for
-`nixos-install`. The target imports Determinate and includes `fh`. Live media
-settings (installer packages, the `nixos` user, live autologin and permissive live
-Polkit rules) are not imported into the target.
+## Build
 
-The desktop choices are the official Calamares choices; Plasma is the live
-desktop, not a restriction on the desktop you install. Installation requires an
-Internet connection to retrieve pinned inputs and any packages absent from the
-live store. Encrypted installs and alternative desktop choices are inherited
-from upstream; see `TESTING.md` for the exact scenarios verified here.
-
-## Build with Nix
-
-On an x86_64 Linux machine with flakes enabled:
+With Nix on an x86_64 Linux host:
 
 ```sh
 nix flake check --no-update-lock-file -L
@@ -62,17 +60,7 @@ nix build .#iso --no-update-lock-file -L
 sha256sum result/iso/*.iso
 ```
 
-The ISO is in `result/iso/`. This is a declarative rebuild from locked sources,
-not a modification of a downloaded ISO's filesystem. Ordinary package
-substitutions retain Nix's signature/hash checking. There is no requirement to
-log into FlakeHub to build the public configuration.
-
-## Build without installing Nix on the host
-
-Requirements: Linux x86_64, QEMU with KVM, `bsdtar`, OpenSSH, Rust/Cargo,
-[`rust-script`](https://rust-script.org/), access
-to `/dev/kvm`, about 16 GiB available RAM and 40 GiB free disk space. The sparse
-builder disk has a maximum size of 100 GiB. Builds can download several GiB.
+Without installing Nix on the host, use the rootless QEMU builder:
 
 ```sh
 cargo install rust-script --version 0.36.0 --locked
@@ -80,129 +68,92 @@ rustup target add x86_64-unknown-linux-musl
 rust-script --force scripts/build_rootless.rs /path/to/nixos-with-determinate.iso
 ```
 
-The script checks the SHA-256 of the original Determinate ISO used for this
-respin, starts a disposable builder VM, builds with its existing Determinate Nix,
-and copies the output ISO into `artifacts/rust-script/`. It needs **no host sudo**. Its reusable
-Nix store is in `.work/rootless/builder.raw`; it never attaches a host block
-device. Detailed output is saved in `artifacts/rust-script/build.log`. The Rust
-builder exports the ISO atomically and writes its SHA-256 sidecar; it does not
-overwrite the original pre-migration ISO in `artifacts/`.
+Requirements: Linux x86_64, QEMU/KVM access, `bsdtar`, OpenSSH, Rust/Cargo,
+rust-script, about 16 GiB available RAM and at least 40 GiB free disk space.
+The reusable sparse builder disk has a maximum size of 100 GiB. Builds download
+several GiB. Normal package signature/hash checking remains enabled.
 
-The guest bootstrap is a statically linked Rust executable, built on the host
-from the same sources. No Rust compiler or Cargo registry access is needed in
-the bootstrap VM or live installer. The downloaded bootstrap ISO and all flake
-inputs remain unchanged.
+The builder checks the bootstrap ISO's SHA-256, builds in the VM and atomically
+exports the ISO and checksum into `artifacts/native-rust/`. Its Nix store is in
+`.work/rootless/builder.raw`; it never attaches a host block device or needs
+host sudo. Logs are in `artifacts/native-rust/build.log`. Earlier ISO artifacts
+and the completed `codex/rustscript-scripts` branch are preserved.
 
-For another bootstrap ISO, supply `--sha256` with a separately verified hash.
-That changes only the build environment; the repository's lock still determines
-the built image. The bootstrap hash used here is
+The default bootstrap hash is
 `80588c226d84e16fe11b2e4afa9fc4add02902e7041dcb220960df5a6cde5fb5`.
+For a different bootstrap image, pass `--sha256` with a separately verified
+hash; that changes the build environment, not the pinned output inputs.
 
-## Test in QEMU
-
-These tests boot the complete ISO as a **USB mass-storage device**, through real
-firmware. They do not use direct kernel boot or present the ISO as a CD to claim
-USB bootability.
+## QEMU verification
 
 ```sh
-rust-script --force scripts/qemu_test.rs artifacts/rust-script/NAME.iso --firmware bios
-rust-script --force scripts/qemu_test.rs artifacts/rust-script/NAME.iso --firmware uefi
-rust-script --force scripts/qemu_test.rs artifacts/rust-script/NAME.iso --firmware uefi --install
+rust-script --force scripts/qemu_test.rs artifacts/native-rust/NAME.iso --firmware uefi --install
+rust-script --force scripts/qemu_test.rs artifacts/native-rust/NAME.iso --firmware bios --install
 ```
 
-UEFI tests require OVMF. The defaults match Arch/CachyOS's `edk2-ovmf` paths;
-override `OVMF_CODE` and `OVMF_VARS` with matching firmware files on other hosts.
-Secure Boot is not enabled for these tests.
+Tests boot the complete ISO as read-only **USB mass storage**, through real
+firmware, not direct kernel boot. UEFI needs OVMF; set `OVMF_CODE` and
+`OVMF_VARS` if your matching firmware files differ from the Arch/CachyOS defaults.
+Secure Boot is not enabled.
 
-Tests save screenshots, serial logs and a JSON result under `artifacts/`. The
-optional installation test supplies fixed form values to the real packaged
-Calamares Python job, installs Plasma to a fresh 40 GiB virtual disk, and boots
-that disk with the ISO removed. It adds a guest agent and serial console to the
-test target for diagnostics; normal GUI installations do not get these test
-settings. This is a backend integration test, not an automated click-through of
-every Calamares page. The actual live GUI is checked separately.
+Installation tests create a fresh 40 GiB regular-file virtual disk, invoke the
+real packaged helper and boot the installed disk without the ISO. The fixed
+public test credentials are only used in the disposable VM. A statically linked
+fixture is built from the **same pinned fork revision** and shared into the VM;
+neither this fixture nor the orchestration tools are shipped on the normal ISO.
 
-If a test was interrupted **after** its log recorded `CALAMARES_INSTALL_PASS`,
-the installed disk can be verified without reinstalling:
+The fixture first checks the real media configuration with diagnostics disabled.
+It enables a guest agent and serial console only inside the guarded test VM,
+never by editing store contents. Installed-system checks include unchanged
+lock, Determinate services, protected password hash, real PAM rejection and
+acceptance, locked root, and absence of live-only settings. Screenshots and JSON
+results are under `artifacts/`. Backend tests do not by themselves verify every
+interactive GUI control; recorded GUI checks are identified in TESTING.md.
 
-```sh
-rust-script --force scripts/boot_installed.rs RUN-NAME
-```
+For a supervised GUI-to-helper test, add `--gui` (it implies `--install`).
+The test waits up to ten minutes for an operator to fill the actual GUI, then
+checks the installed disk and signs into Plasma with the public test password.
+Use `tests/qmp_input.rs RUN-NAME screenshot|click|key|type` to inspect and drive
+the fixed 1280×800 virtual display; it only accepts this repository's disposable
+40 GiB test-image runs. No fixture installation request is submitted in GUI mode.
+Use these exact test values: `/dev/vda`, hostname `rust-test`, username `rusttest`,
+full name `Rust ${literal} Test`, password `Qemu-Only-Test-123!`, timezone
+`America/Chicago`, locale `en_US.UTF-8`, keyboard `us`, and unfree disabled.
+Review the disk and type `ERASE /dev/vda` only inside that disposable VM.
 
-This accepts only a completed installation run from `artifacts/` and `.work/`,
-uses its original virtual disk and firmware variables, and attaches no ISO.
+A completed backend install can be boot-tested again with
+`rust-script --force scripts/boot_installed.rs RUN-NAME`. This reuses only its
+known regular-file test disk and firmware variables, with no ISO attached.
 
-## RustScript implementation and development
+## Development and installed-system maintenance
 
-All first-party executable scripts are `.rs` files with a `rust-script` shebang
-and embedded Cargo manifest. They share the implementation in `rust/`; they do
-not launch the old Python or shell scripts. `rust/Cargo.lock` pins the production
-tool's dependencies, and the Nix build compiles with that lock without network
-access in its build sandbox. `rust-script` maintains its own Cargo cache for the
-developer entry points; use the locked Cargo/Nix build for release validation.
-Use `--force` when invoking `rust-script` explicitly: its script cache does not
-notice changes to this shared local dependency on its own. All entry-point
-shebangs include `--force`, so direct execution (for example,
-`./scripts/qemu_test.rs ...`) automatically asks Cargo to check for changes.
-Cargo still reuses unchanged compiled dependencies.
-
-The ISO includes the precompiled Rust installer helper and test driver. The
-upstream Calamares job remains Python: the small upstream patch invokes the
-Rust helper, and the integration test supplies Rust callbacks through PyO3 to
-the real Calamares module. No Python test fixture is embedded or generated.
-Nix derivation commands and short SSH/serial/guest-agent command strings still
-use the shell where those interfaces require it.
+All first-party executable scripts are ordinary executable Rust scripts.
+They share the locked native implementation in `rust/`; no Python dependency
+or embedded Python fixture remains. The installer implementation lives in the
+separate GPL-3.0-or-later fork. Declarative Nix build commands, Polkit rules and
+small fixed guest/SSH command strings still use their native interfaces.
 
 ```sh
 cargo test --manifest-path rust/Cargo.toml --locked
-cargo test --manifest-path rust/Cargo.toml --locked --features calamares
-cargo clippy --manifest-path rust/Cargo.toml --all-targets --features calamares -- -D warnings
+cargo clippy --manifest-path rust/Cargo.toml --all-targets --locked -- -D warnings
 cargo fmt --manifest-path rust/Cargo.toml --check
 rust-script --force tests/process_cleanup.rs
 ```
 
-The `calamares` feature requires CPython development libraries on the developer
-machine. They are provided by Nix for the packaged tools; host-side rootless
-building and VM orchestration do not require host Python. RustScript entry
-points also support `--help`; guest-only commands retain disk-serial, size,
-filesystem and privilege checks before any partitioning or formatting.
+Use script shebangs or `rust-script --force` to detect changes in the shared
+local crate. Cargo still reuses unchanged dependencies.
 
-## After installation
+The installed configuration is in `/etc/nixos/`. Rebuild with
+`sudo nixos-rebuild switch --flake /etc/nixos#YOUR-HOSTNAME`.
+A hostname change does not automatically rename the flake output.
+Update inputs deliberately with `sudo nix flake update` from `/etc/nixos`;
+do not change `system.stateVersion` merely to upgrade packages.
 
-The installed configuration is `/etc/nixos/{flake.nix,flake.lock,configuration.nix,hardware-configuration.nix}`.
-Use the hostname chosen in Calamares as the flake output name:
+The password hash is in `/etc/nixos-secrets/user-password.hash` (root-only),
+referenced by `hashedPasswordFile`. Update/remove that declarative setting
+appropriately if you want later password changes to persist across activation.
 
-```sh
-sudo nixos-rebuild switch --flake /etc/nixos#YOUR-HOSTNAME
-```
-
-To update packages and Determinate deliberately:
-
-```sh
-cd /etc/nixos
-sudo nix flake update
-sudo nixos-rebuild switch --flake /etc/nixos#YOUR-HOSTNAME
-```
-
-Changing `networking.hostName` later does not rename the flake output. Rename the
-output yourself or keep using its original name. `system.stateVersion` is the
-compatibility setting generated by Calamares; do not change it just to upgrade.
-
-## Repository layout and publication
-
-- `flake.nix`, `flake.lock`: image definition and exact upstream revisions.
-- `modules/installer.nix`: live installer integration.
-- `templates/flake.nix.in`: installed system's flake template.
-- `calamares/prepare_target.rs`, `patches/`: the installation handoff.
-- `tests/`, `scripts/`: executable RustScript entry points.
-- `rust/`: shared Rust implementation, unit tests and locked dependencies.
-- `nix/tools.nix`: the offline-built native installer helper and test driver.
-- `TESTING.md`: recorded results and verification limits.
-
-`.work/`, `artifacts/`, virtual disks, generated SSH keys, logs and ISOs are
-ignored by Git. Publish the source repository normally; publish the large ISO
-and its SHA-256 separately as release assets if desired. No GitHub repository or
-remote is created by the local build.
-
-The repository's integration code uses Apache-2.0; see `LICENSE` and `NOTICE`.
-Bundled components retain their upstream licenses.
+ISOs, logs, private builder keys and virtual disks remain ignored under
+`artifacts/` and `.work/`. Publish source normally and large ISO/checksum files
+as separate release assets if desired. Integration code is Apache-2.0; upstream
+components retain their licenses. See [NOTICE](NOTICE).

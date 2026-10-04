@@ -264,7 +264,7 @@ pub fn main(args: Vec<String>) -> Result<()> {
             }
         }
     });
-    let artifacts = repo.join("artifacts/rust-script");
+    let artifacts = repo.join("artifacts/native-rust");
     fs::create_dir_all(&artifacts)?;
     let ssh = |remote: &str| -> Command {
         let mut cmd = Command::new("ssh");
@@ -400,7 +400,7 @@ pub fn build_iso() -> Result<()> {
             "2",
             "-L",
         ]))?;
-    let dest = Path::new("/workspace/artifacts/rust-script");
+    let dest = Path::new("/workspace/artifacts/native-rust");
     fs::create_dir_all(dest)?;
     let mut found = false;
     for entry in fs::read_dir("/build/result/iso")? {

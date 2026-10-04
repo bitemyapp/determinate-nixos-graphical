@@ -1,8 +1,7 @@
 # Adapted from DeterminateSystems/nixos-iso (Apache-2.0).
-# Changes: official Plasma/Calamares frontend, pinned target flake, and tests.
+# Official graphical base, native Rust installer, unchanged system input lock.
 {
-  description = "Unofficial NixOS graphical installer with Determinate Nix";
-
+  description = "Unofficial NixOS graphical installer with Determinate Nix and Rust Calamares";
   inputs.nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1";
   inputs.determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
   inputs.fh.url = "https://flakehub.com/f/DeterminateSystems/fh/*.tar.gz";
@@ -19,50 +18,50 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       tools = import ./nix/tools.nix { inherit pkgs; };
+      calamares = import ./nix/calamares.nix { inherit pkgs; };
       installer = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
         modules = [
           determinate.nixosModules.default
-          "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-graphical-calamares-plasma6.nix"
+          "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-graphical-base.nix"
           ./modules/installer.nix
         ];
       };
+      etc = installer.config.environment.etc;
     in
     {
       nixosConfigurations.installer = installer;
       packages.${system} = {
         default = self.packages.${system}.iso;
         iso = installer.config.system.build.isoImage;
-        calamares-extensions = installer.pkgs.calamares-nixos-extensions;
-        inherit tools;
+        inherit tools calamares;
       };
       checks.${system} = {
-        generate-config = pkgs.runCommand "generate-config-tests" { } ''
-          mkdir -p "$TMPDIR/target"
-          ${installer.config.system.build.nixos-generate-config}/bin/nixos-generate-config \
-            --root "$TMPDIR/target" --no-filesystems --flake
-          ${tools}/bin/respin-tools check-config generated \
-            "$TMPDIR/target/etc/nixos/flake.nix" ${./templates/flake.nix.in}
+        native-installer = calamares;
+        template-lock = pkgs.runCommand "template-lock-tests" { } ''
+          ${tools}/bin/respin-tools check-config template ${./templates/flake.nix.in} ${./flake.lock}
           touch $out
         '';
-        calamares-handoff = pkgs.runCommand "calamares-handoff-tests" { } ''
-          ${tools}/bin/respin-tools test-handoff \
-            ${./templates/flake.nix.in} ${./flake.lock} \
-            ${installer.pkgs.calamares-nixos-extensions}/lib/calamares/modules/nixos/main.py
-          touch $out
-        '';
-        kernel-defaults =
+        kernel-settings =
           let
-            lts =
-              pkgs.writeText "lts-defaults.ini"
-                installer.config.environment.etc."nixos-generate-config.conf".text;
+            lts = pkgs.writeText "lts-settings.json" etc."calamares-nixos/settings.json".text;
             latest =
-              pkgs.writeText "latest-defaults.ini"
-                installer.config.specialisation.latest_kernel.configuration.environment.etc."nixos-generate-config.conf".text;
+              pkgs.writeText "latest-settings.json"
+                installer.config.specialisation.latest_kernel.configuration.environment.etc."calamares-nixos/settings.json".text;
           in
-          pkgs.runCommand "kernel-defaults-tests" { } ''
-            ${tools}/bin/respin-tools check-config defaults ${lts} ${latest}
+          assert !(etc ? "nixos-generate-config.conf");
+          assert !(etc ? "determinate-installer/flake.lock");
+          assert builtins.all (
+            p:
+            !(builtins.elem (pkgs.lib.getName p) [
+              "calamares-nixos"
+              "calamares-nixos-extensions"
+              "respin-tools"
+            ])
+          ) installer.config.environment.systemPackages;
+          pkgs.runCommand "native-kernel-settings-tests" { } ''
+            ${tools}/bin/respin-tools check-config settings ${lts} ${latest}
             touch $out
           '';
       };

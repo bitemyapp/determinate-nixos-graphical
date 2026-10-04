@@ -1,117 +1,105 @@
-# RustScript migration verification
+# Native Rust installer verification
 
-Branch: `codex/rustscript-scripts`, based on the original release commit
-`3bdda3a`. The prior [verification record](docs/testing-3bdda3a.md), image,
-checksums and test evidence are retained separately. They do not count as tests
-of a newly built image.
+This report applies to the `codex/rust-calamares-integration` branch.
+Historical results for the completed rust-script migration are preserved in
+[docs/testing-a207aa5.md](docs/testing-a207aa5.md); they are not evidence for this ISO.
 
-## Implementation checks
+## Build and integrity
 
-- All seven original first-party Python/shell scripts have RustScript entry
-  points and Rust implementations. The two inline Python Nix checks also moved
-  to Rust, exposed by `tests/check_config.rs`.
-- Cargo tests cover strict INI parsing, target-hostname validation, refusal of
-  symlinks/existing disks, boot-entry parsing, shell/QEMU argument escaping,
-  QMP/QGA response matching and EOF handling, and shutdown completion based on
-  process exit status without a guest-agent success reply.
-- A separate RustScript regression verifies that timed-out child processes are
-  terminated and reaped, and that already-exited children clean up normally.
-- Target-handoff tests preserve the GUI configuration and exact lock, check
-  valid/default/invalid hostnames, reject host root and missing hardware, and
-  execute the real patched Calamares argument-construction AST through PyO3.
-- The guest integration fixture is Rust, including disk checks, partitioning,
-  UI data, logging, progress callbacks and test-only configuration injection.
-  It invokes the packaged upstream job, including our handoff patch, through
-  CPython's API.
-- Clippy is run with warnings denied; Rust formatting and Git whitespace checks
-  are required before committing.
+- Nixpkgs: `c59305bab2065cfecc4944690d9eedbb56f3a9fa`.
+- Rust installer: `03fecd58c7bca8eb2df6774ec08962c6a7b89e74`.
+- Installer source content hash: `sha256-6hR1djn5pVfd895Btmqi560GZvnua1LUuzremY0im0w=`.
+- Unchanged system lock SHA-256: `2a1e300d41e32889d2f108a9405294cf89f0a196d755bfc4bf43b8eea9852d69`.
+- ISO: `artifacts/native-rust/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`.
+- Size: **3,813,998,592 bytes**.
+- SHA-256: `18a236b2593a75e6954430776f2bfdc0872c35ac3891e421a4107c109a0f135e`.
 
-Host checks passed with Rust/Cargo 1.99.0 and `rust-script` 0.36.0: nine unit
-tests both with and without the Calamares feature, the separate process-cleanup
-regression, the handoff regression and actual upstream AST test. Negative CLI
-checks rejected a device instead of an ISO, a wrong bootstrap checksum,
-guest-only operations on the host, host-root target preparation and a recovery
-run name containing a path.
+The host independently hashed the exported ISO. The rootless builder exports
+atomically and generates a checksum sidecar. This is a custom-built image,
+not a vendor-signed ISO; the checksum identifies these exact tested bytes.
+Nix fetched the fork at the exact commit with the recorded content hash.
+Normal Nix package verification was not disabled for the ISO build.
 
-Every entry point was also executed directly through its shebang with `--help`.
-The shebangs include `rust-script --force` so shared Rust dependency changes are
-checked by Cargo instead of reusing rust-script's otherwise stale script cache.
+All three flake checks passed: native installer package, pinned template/lock,
+and LTS/latest JSON settings. The last check also rejects legacy installer
+packages/tools and old INI/handoff settings. The installer package passed
+14 unit tests after the store-permissions fix; the orchestration crate passed 10 tests both locally and in the
+Nix sandbox. Rustfmt, Nixfmt, Clippy with warnings denied, RustScript entry-point
+compilation and process-cleanup regression checks passed.
 
-## Runtime validation
+## Image-level QEMU tests
 
-The corrected image was rebuilt on 2026-10-03 through `scripts/build_rootless.rs`.
-All three named Nix checks and all nine packaged Rust unit tests passed. The
-builder exited successfully and the host independently verified the checksum.
+Both final-image runs passed on 2026-10-04 UTC using the exact ISO hash above:
 
-- File: `artifacts/rust-script/nixos-graphical-determinate-26.11.20261001.c59305b-x86_64-linux.iso`
-- Size: 3,880,910,848 bytes
-- SHA-256: `3dd85d328e420af4c88c016b45dc9c4f69460c82b7d628218371b17110676447`
-- Nix store output: `/nix/store/d0fd1zgxnykdqvpx97rldf2bd1vdmkqi-nixos-graphical-determinate-26.11.20261001.c59305b-x86_64-linux.iso`
+| Firmware | Installation path | Result and evidence |
+| --- | --- | --- |
+| UEFI | Actual GTK GUI → Polkit → Rust helper | [PASS, including graphical Plasma login](docs/test-results/native-uefi.json), run `uefi-1791077035283-60781` |
+| BIOS | Packaged Rust helper protocol | [PASS, including PAM authentication and visible SDDM login](docs/test-results/native-bios.json), run `bios-1791077091994-60920` |
 
-Both fresh tests passed the complete live USB boot, real Calamares installation,
-orderly poweroff and installed-disk-only boot sequence under QEMU 11.1.1 with
-KVM, 4 vCPUs, 8 GiB RAM and a new 40 GiB virtual disk per run:
+The UEFI GUI run verified the actual
+review screen, disabled install button for a wrong erase phrase, enabled button
+for the exact phrase plus consent, GUI-to-Polkit helper launch, visible progress,
+and refusal to close normally while installation is active. Its completion
+screen was visually checked, then the installed disk booted without the ISO.
+QMP keyboard input signed into SDDM with the test user's password; the test
+confirmed that user's Plasma shell and captured the logged-in desktop.
 
-- UEFI: `uefi-1791071352675-33155` — [result](docs/test-results/rust-uefi.json).
-- BIOS: `bios-1791071644722-34133` — [result](docs/test-results/rust-bios.json).
+Both installed systems passed password-hash verification and actual PAM
+rejection/acceptance of wrong/correct passwords, with root locked and the live
+user/installer absent. Determinate Nix 3.23.0 / Nix 2.35.2, `fh` 0.1.27, the
+desktop service and the unchanged flake lock were verified. Password-file
+permissions and literal `Rust ${literal} Test` configuration escaping passed.
+The BIOS backend run also verified bad-confirmation rejection and preflight
+without disk writes. Both VMs shut down successfully after verification.
 
-The UEFI script was launched from `/tmp` to exercise repository discovery
-outside the checkout. Both results record the corrected ISO's SHA-256. Initial
-failures below are retained separately and are not counted as passes. All test
-and builder VMs have stopped; no host block device was attached.
+Visual evidence: [erase guard](docs/images/native-erase-guard.png),
+[installation complete](docs/images/native-install-complete.png),
+[logged-in Plasma](docs/images/native-installed-desktop.png), and
+[BIOS login screen](docs/images/native-bios-login.png).
 
-Both installed systems report Determinate Nix 3.23.0 (Nix 2.35.2), `fh`
-0.1.27, an active Determinate Nixd socket and display manager, the target user
-`respintest`, no live `nixos` account, no Calamares command in the system profile,
-no installer template directory, and the original flake lock. Both installed
-login screens were visually inspected; no interactive password-login test is
-claimed.
+The tests attach the full ISO read-only as USB mass storage and boot through
+OVMF or SeaBIOS. They create a fresh 40 GiB regular-file-backed disk with serial
+`RESPIN_TEST_ONLY`, then shut down and boot it with the ISO physically absent
+from the VM device configuration. No host block device, sudo or reboot is used.
 
-![Corrected ISO's live graphical installer](docs/images/rust-live-installer.png)
+Backend mode exercises bad-confirmation rejection, read-only preflight and the
+normal packaged helper protocol. Supervised GUI mode uses QMP keyboard/mouse
+input to fill the real form and invokes the helper through the actual GUI and
+Polkit wrapper; it does not inject a fixture installation request. It also
+attempts a graphical login after reboot, in addition to the backend/PAM checks.
 
-![UEFI installed system's SDDM login screen, with the ISO removed](docs/images/rust-installed-login.png)
+The shared, pinned test fixture is absent from normal media. Before enabling
+VM-only guest-agent/serial diagnostics, it validates the real media settings
+and confirms diagnostics were disabled. It replaces the live `/etc` settings
+link, never writes to the immutable Nix store, and never modifies the ISO.
 
-### Initial build and regression discovery
+## Limits and provenance
 
-The initial Rust-driven rootless build completed on 2026-10-03. Its three named
-Nix checks and eight then-existing unit tests passed. The static Rust guest
-bootstrap, persistent-store setup, image export and builder shutdown ran
-without host root privileges. The image and log are retained under
-`artifacts/rust-script-initial/`.
+Only the default LTS kernel installation path was exercised end to end.
+The latest-kernel menu/configuration is evaluated and checked, not claimed as
+a complete tested installation. Secure Boot is not enabled.
 
-- File: `nixos-graphical-determinate-26.11.20261001.c59305b-x86_64-linux.iso`
-- Size: 3,880,910,848 bytes
-- SHA-256: `898b3200704b64c1a7b46d346bad4298caf08c637d06bfb2e9c39069efdfa00a`
-- Nix store output: `/nix/store/dmrmj7h88kd4bmvv14p8dml19kcl3041-nixos-graphical-determinate-26.11.20261001.c59305b-x86_64-linux.iso`
+The installer supports whole-disk GPT/ext4 with Plasma, BIOS/UEFI and network
+access. No manual partitioning, dual boot, encryption, RAID/LVM, Btrfs, offline
+installation, other desktop, translated interface or upstream plugin parity
+is implemented or claimed. VM results do not guarantee physical hardware
+compatibility.
 
-The host's independent SHA-256 calculation matched the Rust builder's sidecar.
-The original release image remains separate and unchanged. The flake lock is
-also unchanged: SHA-256
-`2a1e300d41e32889d2f108a9405294cf89f0a196d755bfc4bf43b8eea9852d69`.
+The standalone fork had already passed packaged UEFI and BIOS installations
+before integration; its detailed evidence is in
+[RUST-TESTING.md](https://github.com/bitemyapp/calamares/blob/f09bcc246d7245bdceb09a0fcc5b27d340d877ad/RUST-TESTING.md).
+The integration initially caught and corrected a misnamed NixOS Polkit option.
+The first integrated UEFI (`uefi-1791076495267-57443`) and BIOS
+(`bios-1791076545709-58030`) runs booted the native desktop but stopped before
+any erase: the configuration guard rejected `/nix/store` mode `1775`. The fix
+allows only that root-owned sticky store-root case, still rejects writable
+entries below it, and checks link ownership as well as resolved ownership.
+The first ISO (SHA-256 `21f6eda6b889ec32bb225cd9fa7d0c596ccbb6444be4b21bf7a6cbdaca2d5c52`)
+is retained under `artifacts/native-rust-initial/`. A later build was interrupted
+and restarted from the preserved builder store; its log is retained as well.
+The source-fetch bootstrap deliberately used a placeholder hash to obtain and
+then pin the real content hash; subsequent checks used the real hash.
 
-Both initial runs booted the live Plasma/Calamares GUI. UEFI run
-`uefi-1791070204260-27560` was interrupted during installation; the source of the
-interrupt was not established. It is [recorded as failed](docs/test-results/rust-uefi-interrupted.json),
-and its VM was stopped by the Rust process cleanup.
-
-BIOS run `bios-1791070204232-27559` completed the real Calamares installation and
-powered off, but the harness incorrectly awaited a shutdown RPC response. It is
-also [recorded as failed](docs/test-results/rust-bios-shutdown-failure.json).
-[QEMU's protocol](https://www.qemu.org/docs/master/interop/qemu-ga-ref.html#command-guest-shutdown)
-sends no success reply to `guest-shutdown`; the corrected harness waits for
-QEMU's zero exit status. The new ninth unit test covers both zero and nonzero
-process exits with no reply. Ordinary RPC EOF still fails. Final tests use fresh
-disks and a rebuilt image, not either of these partial runs.
-
-## Scope
-
-QEMU tests exercise BIOS/UEFI boot of the ISO as USB mass storage, the live
-Plasma/Calamares GUI, real Calamares backend installation to a disposable disk,
-and disk-only boot with runtime checks for Determinate Nix, `fh`, the daemon,
-display manager, target user and unchanged lock. They do not automate all GUI
-pages or password entry. Test-only guest-agent and serial-console settings are
-not added by normal GUI installs.
-
-Physical USB writes, real hardware, Secure Boot, encrypted/Btrfs/dual-boot
-installations, alternative desktops and booting the newer-kernel entry are not
-part of this migration's verification. No host reboot or sudo is required.
+Prior ISO images and failed/development run artifacts are retained locally,
+not relabeled as passes. The physical Samsung USB stick is unchanged by this
+leg of work.

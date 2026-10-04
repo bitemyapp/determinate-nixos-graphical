@@ -1,5 +1,5 @@
-# Determinate integration follows DeterminateSystems/nixos-iso (Apache-2.0).
-# This module only applies to the live installer, never the installed system.
+# Live media only; never imported by the installed machine.
+# Plasma setup follows the official NixOS graphical installer module (MIT).
 {
   config,
   lib,
@@ -8,67 +8,84 @@
   ...
 }:
 let
-  tools = import ../nix/tools.nix { inherit pkgs; };
+  calamares = import ../nix/calamares.nix { inherit pkgs; };
+  settings =
+    kernel:
+    builtins.toJSON {
+      template_dir = "/etc/calamares-nixos";
+      zoneinfo = "${pkgs.tzdata}/share/zoneinfo";
+      state_version = config.system.nixos.release;
+      inherit kernel;
+      test_diagnostics = false;
+    };
 in
 {
-  nixpkgs.overlays = [
-    (final: prev: {
-      calamares-nixos-extensions = prev.calamares-nixos-extensions.overrideAttrs (old: {
-        patches = (old.patches or [ ]) ++ [ ../patches/calamares-flake-install.patch ];
-        postPatch = (old.postPatch or "") + ''
-          substituteInPlace modules/nixos/main.py \
-            --replace-fail '@prepareTarget@' '${tools}/bin/respin-tools'
-        '';
-      });
-    })
-  ];
-
+  services.desktopManager.plasma6 = {
+    enable = true;
+    enableQt5Integration = false;
+  };
+  services.displayManager = {
+    plasma-login-manager.enable = true;
+    autoLogin = {
+      enable = true;
+      user = "nixos";
+    };
+  };
+  environment.plasma6.excludePackages = [ pkgs.kdePackages.plasma-workspace-wallpapers ];
+  programs.kde-pim.enable = false;
   environment.systemPackages = [
     inputs.fh.packages.${pkgs.stdenv.hostPlatform.system}.default
-    # Precompiled from the same Rust implementation as the script entry points.
-    # This avoids compilation or registry access in the live installer.
-    tools
+    calamares
+    (pkgs.makeAutostartItem {
+      name = "org.calamares.NixOSRust";
+      package = calamares;
+    })
   ];
+  # No blanket wheel grant from the graphical base. Only the local active live
+  # user may start this exact helper without a password; other policies remain.
+  security.polkit.enable = true;
+  security.polkit.enablePkexecWrapper = true;
+  security.polkit.extraConfig = lib.mkForce ''
+    polkit.addRule(function(action, subject) {
+      if (action.id == "org.calamares.nixos.install" &&
+          subject.user == "nixos" && subject.local && subject.active) {
+        return polkit.Result.YES;
+      }
+    });
+  '';
   networking.wireless.enable = lib.mkForce false;
   networking.networkmanager.enable = true;
 
-  # Carry exactly the same revisions into the installed machine. Calamares
-  # replaces only @HOSTNAME@ and explicitly passes --flake to nixos-install.
-  environment.etc."determinate-installer/flake.nix.in".source = ../templates/flake.nix.in;
-  environment.etc."determinate-installer/flake.lock".source = ../flake.lock;
-  environment.etc."nixos-generate-config.conf".text = ''
-    [Defaults]
-    Flake=1
-    Kernel=lts
-  '';
-  # This option is inserted into an interpolating Perl heredoc, not written
-  # directly as Nix. Protect literal Nix interpolation and Perl sigils.
-  system.nixos-generate-config.flake = lib.replaceStrings [ "\\" "$" "@" ] [ "\\\\" "\\$" "\\@" ] (
-    lib.replaceStrings [ "@HOSTNAME@" ] [ ''"nixos"'' ] (builtins.readFile ../templates/flake.nix.in)
-  );
-
-  isoImage.edition = lib.mkForce "plasma-determinate";
-  isoImage.volumeID = "nixos-determinate-x86_64";
-  image.baseName = lib.mkForce "nixos-graphical-determinate-${config.system.nixos.label}-x86_64-linux";
-  isoImage.appendToMenuLabel = " Graphical Installer with Determinate";
-  isoImage.configurationName = "Plasma (Linux LTS)";
-  specialisation.latest_kernel.configuration =
-    { config, lib, ... }:
-    {
-      imports = [ "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/latest-kernel.nix" ];
-      isoImage.configurationName = lib.mkForce "Plasma (Linux ${config.boot.kernelPackages.kernel.version})";
-      # Avoid merging two [Defaults] sections: Python's ConfigParser rejects
-      # duplicate sections, which would otherwise break the Calamares job.
-      environment.etc."nixos-generate-config.conf".text = lib.mkForce ''
-        [Defaults]
-        Flake=1
-        Kernel=latest
-      '';
+  # The native backend writes the target flake and explicitly selects it.
+  # No Python patch, global-storage bridge or nixos-generate-config override.
+  environment.etc."calamares-nixos/flake.nix.in".source = ../templates/flake.nix.in;
+  environment.etc."calamares-nixos/flake.lock".source = ../flake.lock;
+  environment.etc."calamares-nixos/settings.json".text = settings "lts";
+  systemd.tmpfiles.settings."10-installer-desktop" = {
+    "/home/nixos/Desktop".d = {
+      user = "nixos";
+      group = "users";
+      mode = "0755";
     };
-  # A smaller compression budget makes local rebuilds practical.
-  isoImage.squashfsCompression = "zstd -Xcompression-level 6";
+    "/home/nixos/Desktop/nixos-manual.desktop"."L+".argument =
+      "/run/current-system/sw/share/applications/nixos-manual.desktop";
+    "/home/nixos/Desktop/gparted.desktop"."L+".argument =
+      "${pkgs.gparted}/share/applications/gparted.desktop";
+    "/home/nixos/Desktop/org.calamares.NixOSRust.desktop"."L+".argument =
+      "${calamares}/share/applications/org.calamares.NixOSRust.desktop";
+  };
 
-  # Permit serial diagnostics without removing the normal graphical console.
+  isoImage.edition = lib.mkForce "plasma-determinate-rust";
+  isoImage.volumeID = "nixos-determinate-x86_64";
+  image.baseName = lib.mkForce "nixos-graphical-determinate-rust-${config.system.nixos.label}-x86_64-linux";
+  isoImage.appendToMenuLabel = " Rust Graphical Installer with Determinate";
+  isoImage.configurationName = "Plasma (Linux LTS)";
+  specialisation.latest_kernel.configuration = { config, lib, ... }: {
+    imports = [ "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/latest-kernel.nix" ];
+    isoImage.configurationName = lib.mkForce "Plasma (Linux ${config.boot.kernelPackages.kernel.version})";
+    environment.etc."calamares-nixos/settings.json".text = lib.mkForce (settings "latest");
+  };
+  isoImage.squashfsCompression = "zstd -Xcompression-level 6";
   boot.kernelParams = [
     "console=ttyS0,115200n8"
     "console=tty0"

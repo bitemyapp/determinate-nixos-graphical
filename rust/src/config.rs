@@ -1,58 +1,75 @@
 use anyhow::{Result, bail, ensure};
-use std::{collections::BTreeMap, fs};
+use serde_json::Value;
+use std::{collections::BTreeSet, fs};
 
-fn defaults(text: &str) -> Result<BTreeMap<String, String>> {
-    let mut section = false;
-    let mut values = BTreeMap::new();
-    for line in text
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with(['#', ';']))
-    {
-        if line.starts_with('[') {
-            ensure!(
-                line == "[Defaults]" && !section,
-                "Unexpected or duplicate INI section"
-            );
-            section = true;
-        } else {
-            ensure!(section, "INI setting outside Defaults");
-            let (k, v) = line
-                .split_once('=')
-                .ok_or_else(|| anyhow::anyhow!("Invalid INI setting"))?;
-            ensure!(
-                values
-                    .insert(k.trim().to_lowercase(), v.trim().to_string())
-                    .is_none(),
-                "Duplicate INI key"
-            );
-        }
+fn settings(text: &str, kernel: &str) -> Result<()> {
+    let value: Value = serde_json::from_str(text)?;
+    ensure!(value["kernel"] == kernel, "Incorrect kernel choice");
+    ensure!(
+        value["test_diagnostics"] == false,
+        "Test diagnostics shipped enabled"
+    );
+    ensure!(
+        value["template_dir"] == "/etc/calamares-nixos",
+        "Wrong template path"
+    );
+    ensure!(
+        value["zoneinfo"]
+            .as_str()
+            .is_some_and(|s| s.starts_with("/nix/store/") && s.ends_with("/share/zoneinfo")),
+        "Unpinned timezone database"
+    );
+    ensure!(
+        matches!(value["state_version"].as_str(), Some("26.05" | "26.11")),
+        "Unsupported state version"
+    );
+    Ok(())
+}
+
+fn template(source: &str, lock: &str) -> Result<()> {
+    ensure!(
+        source.matches("@HOSTNAME@").count() == 1,
+        "Expected one hostname placeholder"
+    );
+    let value: Value = serde_json::from_str(lock)?;
+    ensure!(value["version"] == 7, "Unsupported lock version");
+    let root = value["root"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("Missing lock root"))?;
+    let inputs = value["nodes"][root]["inputs"]
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("Missing inputs"))?;
+    ensure!(
+        inputs.keys().map(String::as_str).collect::<BTreeSet<_>>()
+            == BTreeSet::from(["nixpkgs", "determinate", "fh"]),
+        "Unexpected target inputs"
+    );
+    for name in ["nixpkgs", "determinate", "fh"] {
+        let node = inputs[name]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Expected direct locked input"))?;
+        ensure!(
+            value["nodes"][node]["locked"]["narHash"]
+                .as_str()
+                .is_some_and(|s| s.starts_with("sha256-")),
+            "Unlocked input: {name}"
+        );
     }
-    ensure!(section, "Missing Defaults");
-    Ok(values)
+    Ok(())
 }
 pub fn main(args: Vec<String>) -> Result<()> {
     ensure!(
         args.len() == 3,
-        "Usage: check_config.rs generated|defaults FILE FILE"
+        "Usage: check_config.rs template|settings FILE FILE"
     );
     match args[0].as_str() {
-        "generated" => ensure!(
-            fs::read_to_string(&args[1])?.trim_end()
-                == fs::read_to_string(&args[2])?
-                    .replace("@HOSTNAME@", "\"nixos\"")
-                    .trim_end(),
-            "Generated flake differs from template"
-        ),
-        "defaults" => {
-            for (file, kernel) in args[1..].iter().zip(["lts", "latest"]) {
-                let config = defaults(&fs::read_to_string(file)?)?;
-                ensure!(
-                    config.get("flake").map(String::as_str) == Some("1")
-                        && config.get("kernel").map(String::as_str) == Some(kernel),
-                    "Wrong defaults in {file}"
-                );
-            }
+        "template" => template(
+            &fs::read_to_string(&args[1])?,
+            &fs::read_to_string(&args[2])?,
+        )?,
+        "settings" => {
+            settings(&fs::read_to_string(&args[1])?, "lts")?;
+            settings(&fs::read_to_string(&args[2])?, "latest")?;
         }
         _ => bail!("Unknown check"),
     }
@@ -60,16 +77,31 @@ pub fn main(args: Vec<String>) -> Result<()> {
 }
 #[cfg(test)]
 mod tests {
+    use super::*;
     #[test]
-    fn strict_ini() {
-        assert!(super::defaults("[Defaults]\nFlake=1\nKernel=lts").is_ok());
-        for text in [
-            "[Defaults]\n[Defaults]",
-            "[Defaults]\nFlake=1\nflake=1",
-            "Flake=1",
-            "[Other]",
+    fn rejects_test_diagnostics_and_unpinned_zones() {
+        let good = serde_json::json!({"kernel":"lts","test_diagnostics":false,"template_dir":"/etc/calamares-nixos","zoneinfo":"/nix/store/test-tzdata/share/zoneinfo","state_version":"26.11"});
+        assert!(settings(&good.to_string(), "lts").is_ok());
+        assert!(settings(&good.to_string(), "latest").is_err());
+        for (key, replacement) in [
+            ("test_diagnostics", Value::Bool(true)),
+            ("zoneinfo", Value::String("/tmp/zones".into())),
         ] {
-            assert!(super::defaults(text).is_err());
+            let mut bad = good.clone();
+            bad[key] = replacement;
+            assert!(settings(&bad.to_string(), "lts").is_err());
         }
+    }
+    #[test]
+    fn requires_locked_template() {
+        assert!(template("missing", "{}").is_err());
+        assert!(template("@HOSTNAME@ @HOSTNAME@", "{}").is_err());
+        assert!(
+            template(
+                "@HOSTNAME@",
+                r#"{"version":7,"root":"root","nodes":{"root":{"inputs":{}}}}"#
+            )
+            .is_err()
+        );
     }
 }

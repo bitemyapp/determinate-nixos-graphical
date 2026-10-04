@@ -11,10 +11,6 @@ pkgs.rustPlatform.buildRustPackage {
     ];
   };
   cargoLock.lockFile = ../rust/Cargo.lock;
-  buildFeatures = [ "calamares" ];
-  nativeBuildInputs = [ pkgs.python3 ];
-  buildInputs = [ pkgs.python3 ];
-  PYO3_PYTHON = "${pkgs.python3}/bin/python3";
   # Unit tests include a local Unix socket mock for QMP/QGA; no network/VM access.
   doCheck = true;
   meta = {

@@ -1,11 +1,10 @@
 #!/usr/bin/env -S rust-script --force
-//! prepare-target: executable Rust entry point; shared implementation in ../rust.
-//!
+//! QMP controls for a disposable graphical installation test only.
 //! ```cargo
 //! [dependencies]
 //! anyhow = "=1.0.100"
 //! respin-tools = { path = "../rust" }
 //! ```
 fn main() -> anyhow::Result<()> {
-    respin_tools::dispatch("prepare-target", std::env::args().skip(1).collect())
+    respin_tools::dispatch("qmp-input", std::env::args().skip(1).collect())
 }

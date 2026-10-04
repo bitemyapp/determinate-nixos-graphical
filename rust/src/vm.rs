@@ -301,10 +301,53 @@ impl Drop for Vm {
     }
 }
 
-fn verify_installed(vm: &mut Vm, artifacts: &Path, repo: &Path) -> Result<String> {
+fn fixture(repo: &Path) -> Result<String> {
+    let pin: Value = serde_json::from_slice(&fs::read(repo.join("nix/calamares-source.json"))?)?;
+    let revision = pin["rev"].as_str().context("Missing installer revision")?;
+    ensure!(
+        revision.len() == 40 && revision.bytes().all(|c| c.is_ascii_hexdigit()),
+        "Invalid installer revision"
+    );
+    let root = repo.join(".work/native-fixture").join(revision);
+    run(Command::new("cargo")
+        .args([
+            "install",
+            "--git",
+            "https://github.com/bitemyapp/calamares.git",
+            "--rev",
+            revision,
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-musl",
+            "--root",
+        ])
+        .arg(&root)
+        .arg("--target-dir")
+        .arg(repo.join(".work/fixture-target"))
+        .arg("calamares-vm-fixture"))?;
+    regular(&root.join("bin/calamares-vm-fixture"))?;
+    Ok(format!(
+        "/workspace/.work/native-fixture/{revision}/bin/calamares-vm-fixture"
+    ))
+}
+
+fn verify_installed(
+    vm: &mut Vm,
+    artifacts: &Path,
+    repo: &Path,
+    fixture: &str,
+    graphical_login: bool,
+) -> Result<String> {
     vm.wait_agent()?;
     vm.execute("for i in $(seq 1 90); do systemctl is-active --quiet display-manager && exit 0; sleep 1; done; exit 1", SHORT)?;
-    let output = vm.execute("set -e; test \"$(hostname)\" = respin-test; nix --version; fh --version; systemctl is-active determinate-nixd.socket; systemctl is-active display-manager; test ! -e /etc/determinate-installer; test ! -e /run/current-system/sw/bin/calamares; id respintest; ! id nixos; sha256sum /etc/nixos/flake.lock", SHORT)?;
+    vm.execute(
+        "mkdir -p /workspace; mount -t 9p -o trans=virtio,version=9p2000.L project /workspace",
+        SHORT,
+    )?;
+    let output = vm.execute(
+        &format!("{} verify", shell_quote(fixture)),
+        Duration::from_secs(180),
+    )?;
     ensure!(
         output.contains("nix (Determinate Nix "),
         "Installed Nix is not Determinate: {output}"
@@ -314,6 +357,15 @@ fn verify_installed(vm: &mut Vm, artifacts: &Path, repo: &Path) -> Result<String
         "Installed lock differs from repository"
     );
     pause(Duration::from_secs(10))?;
+    if graphical_login {
+        let mut qmp = Rpc::connect(&vm.work.join("qmp.sock"), true, 20)?;
+        // Fixed public disposable-VM credentials, never the host's password.
+        crate::gui_input::type_text(&mut qmp, "Qemu-Only-Test-123!")?;
+        crate::gui_input::key(&mut qmp, &["ret"])?;
+        drop(qmp);
+        vm.execute("for i in $(seq 1 90); do pgrep -u 1000 -f '^/[^ ]+/bin/[.]?plasmashell' && exit 0; sleep 1; done; exit 1", SHORT)?;
+        pause(Duration::from_secs(10))?;
+    }
     vm.screenshot(&artifacts.join("installed-desktop.png"))?;
     Ok(output)
 }
@@ -344,11 +396,16 @@ pub fn main(args: Vec<String>) -> Result<()> {
     let mut iso = None;
     let mut firmware = "uefi".to_string();
     let mut install = false;
+    let mut gui = false;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--firmware" => firmware = args.next().context("Missing firmware")?,
             "--install" => install = true,
+            "--gui" => {
+                gui = true;
+                install = true;
+            }
             value if !value.starts_with('-') && iso.is_none() => iso = Some(PathBuf::from(value)),
             _ => bail!("Unknown argument: {arg}"),
         }
@@ -371,7 +428,9 @@ pub fn main(args: Vec<String>) -> Result<()> {
     if install {
         sparse(&disk, 40 * 1024u64.pow(3))?;
     }
-    let mut result = json!({"firmware":firmware,"media":"usb-storage","iso":iso.file_name().unwrap().to_string_lossy(),"iso_sha256":digest,"install":install,"passed":false,"implementation":"rust-script"});
+    let fixture = if install { Some(fixture(&repo)?) } else { None };
+    let pin: Value = serde_json::from_slice(&fs::read(repo.join("nix/calamares-source.json"))?)?;
+    let mut result = json!({"firmware":firmware,"media":"usb-storage","iso":iso.file_name().unwrap().to_string_lossy(),"iso_sha256":digest,"install":install,"gui":gui,"passed":false,"implementation":"native-rust","installer_revision":pin["rev"]});
     let mut vm = Vm::start(
         &work,
         &firmware,
@@ -384,7 +443,7 @@ pub fn main(args: Vec<String>) -> Result<()> {
         vm.wait_agent()?;
         let end = Instant::now() + Duration::from_secs(180);
         let live = loop {
-            match vm.execute("set -e; systemctl is-active display-manager; pgrep -f '^/[^ ]+/bin/[.]?plasmashell'; pgrep -f '^/[^ ]+/bin/[.]?calamares'; nix --version; fh --version; systemctl is-active determinate-nixd.socket; test -s /etc/determinate-installer/flake.lock; lsblk -o NAME,TRAN,FSTYPE,LABEL", SHORT) {
+            match vm.execute("set -e; systemctl is-active display-manager; pgrep -u 1000 -f '^/[^ ]+/bin/[.]?plasmashell'; pgrep -u 1000 -f '^/[^ ]+/bin/[.]?calamares-nixos(-wrapped)?( |$)'; nix --version; fh --version; systemctl is-active determinate-nixd.socket; test -s /etc/calamares-nixos/flake.lock; test ! -e /run/current-system/sw/bin/calamares; test ! -e /run/current-system/sw/bin/respin-tools; test ! -e /etc/nixos-generate-config.conf; cat /etc/calamares-nixos/settings.json; lsblk -o NAME,TRAN,FSTYPE,LABEL", SHORT) {
                 Ok(text) => break text, Err(e) if Instant::now() >= end => return Err(e), Err(_) => pause(Duration::from_secs(3))?,
             }
         };
@@ -394,29 +453,61 @@ pub fn main(args: Vec<String>) -> Result<()> {
         );
         println!("{live}");
         result["live"] = json!(live);
+        result["media_config_permissions"] = json!(vm.execute(
+            "stat -c '%u:%g %a %n' /nix/store; stat -Lc '%u:%g %a %n' /etc/calamares-nixos/settings.json",
+            SHORT,
+        )?);
         pause(Duration::from_secs(5))?;
         vm.screenshot(&artifacts.join("live-desktop.png"))?;
         if install {
             vm.execute("mkdir -p /workspace; mount -t 9p -o trans=virtio,version=9p2000.L project /workspace", SHORT)?;
-            println!("Running the Rust fixture against the real Calamares job");
-            // The Nix-built binary has exactly the same Rust implementation as
-            // tests/install_in_guest.rs, without runtime compilation/downloads.
-            vm.execute(
-                &format!(
-                    "/run/current-system/sw/bin/respin-tools install-in-guest > {} 2>&1",
-                    shell_quote(&format!("/workspace/artifacts/{name}/install.log"))
-                ),
-                Duration::from_secs(3600),
+            let fixture = fixture.as_deref().unwrap();
+            println!("Running the pinned native fixture against the packaged Rust installer");
+            let settings = vm.execute(
+                &format!("{} prepare-integrated", shell_quote(fixture)),
+                SHORT,
             )?;
-            result["target_before_reboot"] = json!(vm.execute("set -e; cat /mnt/etc/nixos/flake.nix; sha256sum /mnt/etc/nixos/flake.lock; test -L /mnt/nix/var/nix/profiles/system; readlink /mnt/nix/var/nix/profiles/system; sync", SHORT)?);
-            vm.execute("umount -R /mnt; sync", SHORT)?;
+            fs::write(artifacts.join("fixture-setup.log"), settings)?;
+            // GUI mode is deliberately interactive: the QMP input script drives
+            // the real form. No fixture request is sent to the backend.
+            if gui {
+                println!(
+                    "GUI ready in {name}. Use tests/qmp_input.rs to complete the installation form. Waiting up to 10 minutes for the native helper."
+                );
+                vm.execute("for i in $(seq 1 600); do pgrep -u 0 -f '^/[^ ]+/bin/[.]?calamares-nixos-helper(-wrapped)? install( |$)' && exit 0; sleep 1; done; exit 1", Duration::from_secs(620))?;
+                fs::write(
+                    artifacts.join("install.log"),
+                    "GUI_INSTALL_HELPER_STARTED\n",
+                )?;
+                vm.execute("while pgrep -u 0 -f '^/[^ ]+/bin/[.]?calamares-nixos-helper(-wrapped)? install( |$)' >/dev/null; do sleep 2; done", Duration::from_secs(7500))?;
+                pause(Duration::from_secs(3))?;
+                vm.screenshot(&artifacts.join("gui-finished.png"))?;
+                // Exit alone is not a pass. Boot/authentication decide below.
+                fs::write(
+                    artifacts.join("install.log"),
+                    "GUI_INSTALL_HELPER_STARTED\nGUI_INSTALL_HELPER_EXITED\n",
+                )?;
+            } else {
+                // The fixture is shared from the host, never shipped on the ISO.
+                vm.execute(
+                    &format!(
+                        "{} install > {} 2>&1",
+                        shell_quote(fixture),
+                        shell_quote(&format!("/workspace/artifacts/{name}/install.log"))
+                    ),
+                    Duration::from_secs(7500),
+                )?;
+            }
+            result["backend_completed"] = json!(true);
             vm.poweroff()?;
             fs::copy(work.join("serial.log"), artifacts.join("live-serial.log"))?;
-            vm = Vm::start(&work, &firmware, None, Some(&disk), None)?;
+            vm = Vm::start(&work, &firmware, None, Some(&disk), Some(&repo))?;
             println!("Booting the installed disk with no ISO attached");
-            let installed = verify_installed(&mut vm, &artifacts, &repo)?;
+            let installed = verify_installed(&mut vm, &artifacts, &repo, fixture, gui)?;
             println!("{installed}");
             result["installed"] = json!(installed);
+            result["graphical_login"] = json!(gui);
+            vm.poweroff()?;
         }
         Ok(())
     })();
@@ -437,9 +528,11 @@ pub fn boot_installed(args: Vec<String>) -> Result<()> {
     let mut result: Value = serde_json::from_slice(&fs::read(previous.join("result.json"))?)?;
     ensure!(
         result["install"] == true
+            && result["backend_completed"] == true
             && fs::read_to_string(previous.join("install.log"))?
-                .trim_end()
-                .ends_with("CALAMARES_INSTALL_PASS"),
+                .lines()
+                .any(|line| line == r#"{"kind":"complete"}"#
+                    || (result["gui"] == true && line == "GUI_INSTALL_HELPER_EXITED")),
         "No successful Calamares installation"
     );
     let firmware = result["firmware"]
@@ -481,12 +574,15 @@ pub fn boot_installed(args: Vec<String>) -> Result<()> {
     }
     result["resumed_from"] = json!(args[0]);
     result["disk_only_boot"] = json!(true);
-    result["implementation"] = json!("rust-script");
-    let mut vm = Vm::start(&work, &firmware, None, Some(&disk), None)?;
+    result["implementation"] = json!("native-rust");
+    let fixture = fixture(&repo)?;
+    let mut vm = Vm::start(&work, &firmware, None, Some(&disk), Some(&repo))?;
     println!("Booting installed {firmware} disk; no ISO attached");
-    let outcome = verify_installed(&mut vm, &artifacts, &repo).map(|text| {
+    let gui = result["gui"] == true;
+    let outcome = verify_installed(&mut vm, &artifacts, &repo, &fixture, gui).and_then(|text| {
         println!("{text}");
         result["installed"] = json!(text);
+        vm.poweroff()
     });
     record(vm, &work, &artifacts, &mut result, outcome)
 }
