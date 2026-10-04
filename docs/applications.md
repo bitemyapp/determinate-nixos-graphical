@@ -100,7 +100,19 @@ compile-fail doctests. The separately invoked storage VM passed all 18 real
 ext4/Btrfs/XFS replacement and remount cases (512-byte and 4096-byte sectors),
 plus FAT32 checks. All 34 generated application configurations and all 47
 desktop configurations evaluated successfully. The native orchestration tools
-passed 15 tests and Clippy with warnings denied.
+passed 15 tests and Clippy with warnings denied. Both configuration matrices
+also passed through the normal native build driver.
+
+The new packaged GTK menu was visually exercised in a disposable live session:
+search, the default Firefox selection, Rustup dependency selection and locking,
+releasing that dependency, and clearing/disabling proprietary choices on opt-out.
+The session imported the exact new installer package into the earlier live ISO;
+this isolates UI checks from the still-pending new image validation.
+[Menu result](test-results/application-menu.json),
+[menu](images/applications-menu.png),
+[Rustup dependency](images/applications-rustup-dependency.png),
+[proprietary opt-out](images/applications-proprietary-disabled.png),
+[Docker option](images/applications-docker.png).
 
 The complete application package builds, new ISO installation/runtime tests and
 SanDisk write/read-back are still pending; the old filesystem-only image has
