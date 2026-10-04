@@ -160,9 +160,11 @@ records the user's successful display/input retest, the missing supplicant fix,
 firmware/unfree policy and final-image radio regression tests.
 
 Requirements: Linux x86_64, QEMU/KVM access, `bsdtar`, OpenSSH, Rust/Cargo,
-rust-script, about 16 GiB available RAM and at least 100 GiB free disk space
+rust-script, about 32 GiB available RAM and at least 100 GiB free disk space
 for the builder store and exported image with the optional application cache.
-The reusable sparse builder disk has a maximum size of 100 GiB. Builds download
+The builder VM uses 24 GiB of RAM and limits source compilation to one package
+at a time with four build cores. The reusable sparse builder disk has a maximum
+size of 100 GiB. Builds download
 several GiB. Normal package signature/hash checking remains enabled.
 
 The builder checks the bootstrap ISO's SHA-256, builds in the VM and atomically

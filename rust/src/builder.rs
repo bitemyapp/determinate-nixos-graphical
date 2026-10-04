@@ -165,7 +165,7 @@ pub fn main(args: Vec<String>) -> Result<()> {
                 "-smp",
                 "6",
                 "-m",
-                "12288",
+                "24576",
                 "-display",
                 "none",
                 "-monitor",
@@ -396,7 +396,16 @@ pub fn build_iso(rebuild: bool) -> Result<()> {
     run(Command::new("nix")
         .current_dir("/workspace")
         .env("TMPDIR", "/build/tmp")
-        .args(["flake", "check", "--no-update-lock-file", "-L"]))?;
+        .args([
+            "flake",
+            "check",
+            "--no-update-lock-file",
+            "--max-jobs",
+            "1",
+            "--cores",
+            "4",
+            "-L",
+        ]))?;
     export_wifi_tools()?;
     let mut build = Command::new("nix");
     build
@@ -409,9 +418,9 @@ pub fn build_iso(rebuild: bool) -> Result<()> {
             "/build/result",
             "--no-update-lock-file",
             "--cores",
-            "6",
+            "4",
             "--max-jobs",
-            "2",
+            "1",
             "-L",
         ]);
     if rebuild {
