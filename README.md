@@ -239,6 +239,10 @@ and BIOS/VirtIO, plus the original blank VirtIO case) with:
 rust-script --force scripts/qemu_storage_matrix.rs artifacts/native-rust/NAME.iso
 ```
 
+The matrix installs all applications on NVMe/ext4, Rustup with its build-tools
+dependency on 4Kn NVMe/ext4, no optional applications on BIOS/ext4, and Firefox
+in the remaining cases. Each installation must also pass its disk-only boot.
+
 `nix flake check` also runs a smaller storage VM test against temporary loop
 images: all old/new filesystem pairs, 512-byte/4096-byte sectors, remount data
 integrity and FAT32 mounts. This test can use emulation without nested KVM.

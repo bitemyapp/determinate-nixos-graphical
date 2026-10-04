@@ -124,8 +124,30 @@ install checks. The complete Nix flake checks passed. The rebuilt ISO is
 `231a39d4501b62dcaf721851861a1f8589f3ef364dc95177d30d52fdd5e0eff0`.
 An independent hash of the copied image matched the build output.
 [Build record](test-results/application-build.json),
-[checksum](test-results/application-iso.sha256).
+[checksum](test-results/application-iso.sha256). A separate
+[BIOS live-boot smoke test](test-results/application-bios-live.json) passed,
+checking Linux, desktop/installer processes and Determinate Nix startup. This
+process check does not claim rendered GUI readiness or an installed-system boot.
 
 The new ISO installation/runtime tests and SanDisk write/read-back are still
 pending. The earlier filesystem-only image was archived and was never written
 to this SanDisk.
+
+## Cold-module preflight regression
+
+The first application-enabled candidate was rejected by a full-ISO NVMe/XFS
+case before disk erasure: cold `modprobe xfs` exceeded a 15-second deadline
+while the emulated live desktop was starting. The filesystem-only image's
+passes did not expose that timing condition.
+[Failure record](test-results/application-preflight-rejection.json).
+
+The installer now allows 120 seconds for root/EFI filesystem module loading,
+reports filesystem preparation in its progress text, and preserves the
+underlying error with an explicit statement that no disk writes occurred.
+A regression test checks both root and EFI module failures. The ISO must be
+rebuilt and retested with this fix before release.
+
+The full-install harness also allows both of the installer's separate
+two-hour preparation and installation deadlines, plus test overhead. Its former
+125-minute overall limit could otherwise interrupt a valid slow installation.
+This changes test supervision only; installer deadlines remain unchanged.

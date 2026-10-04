@@ -647,7 +647,9 @@ pub fn main(args: Vec<String>) -> Result<()> {
                     artifacts.join("install.log"),
                     "GUI_INSTALL_HELPER_STARTED\n",
                 )?;
-                vm.execute("while pgrep -u 0 -f '^/[^ ]+/bin/[.]?calamares-nixos-helper(-wrapped)? install( |$)' >/dev/null; do sleep 2; done", Duration::from_secs(7500))?;
+                // Application preparation and installation each have their own
+                // two-hour deadline. Allow both phases to finish under TCG.
+                vm.execute("while pgrep -u 0 -f '^/[^ ]+/bin/[.]?calamares-nixos-helper(-wrapped)? install( |$)' >/dev/null; do sleep 2; done", Duration::from_secs(15000))?;
                 pause(Duration::from_secs(3))?;
                 vm.screenshot(&artifacts.join("gui-finished.png"))?;
                 // Exit alone is not a pass. Boot/authentication decide below.
@@ -663,7 +665,7 @@ pub fn main(args: Vec<String>) -> Result<()> {
                         shell_quote(&root_filesystem), shell_quote(&previous_filesystem), shell_quote(&applications), shell_quote(fixture),
                         shell_quote(&format!("/workspace/artifacts/{name}/install.log"))
                     ),
-                    Duration::from_secs(7500),
+                    Duration::from_secs(15000),
                 )?;
             }
             let live_wifi = vm.execute("nmcli --get-values connection.permissions connection show uuid 135ea3d9-d456-44b1-ae42-1e7081f66666", SHORT)?;
