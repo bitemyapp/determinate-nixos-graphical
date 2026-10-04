@@ -152,3 +152,7 @@ The full-install harness also allows both of the installer's separate
 two-hour preparation and installation deadlines, plus test overhead. Its former
 125-minute overall limit could otherwise interrupt a valid slow installation.
 This changes test supervision only; installer deadlines remain unchanged.
+The original all-applications run subsequently reached that old outer deadline
+while the backend was still installing and is retained as an
+[interrupted test](test-results/application-harness-timeout.json), never a pass.
+The corrected image is undergoing a fresh full installation.
