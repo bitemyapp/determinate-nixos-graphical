@@ -97,7 +97,7 @@ do not establish the behavior of the physical ThinkPad's controller or firmware.
 
 ## Validation in progress
 
-The packaged installer passed 40 library tests, one GUI model test and six
+The packaged installer passed 41 library tests, one GUI model test and six
 compile-fail doctests. The separately invoked storage VM passed all 18 real
 ext4/Btrfs/XFS replacement and remount cases (512-byte and 4096-byte sectors),
 plus FAT32 checks. All 34 generated application configurations and all 47
@@ -114,18 +114,18 @@ this isolates UI checks from the still-pending new image validation.
 [menu](images/applications-menu.png),
 [Rustup dependency](images/applications-rustup-dependency.png),
 [proprietary opt-out](images/applications-proprietary-disabled.png),
-[Docker option](images/applications-docker.png). The rebuilt image also rendered
+[Docker option](images/applications-docker.png). The first application candidate also rendered
 the [application menu](images/applications-final-iso-menu.png) during its own
 full installation tests.
 
 All selected application packages built successfully, including their upstream
-install checks. The complete Nix flake checks passed. The rebuilt ISO is
-9,560,502,272 bytes with SHA-256
-`231a39d4501b62dcaf721851861a1f8589f3ef364dc95177d30d52fdd5e0eff0`.
+install checks. The complete Nix flake checks passed. The corrected application ISO is
+9,560,510,464 bytes with SHA-256
+`e7ec2362952305081c6e5ed6332962a13a50159f1f10352806607b93bbc45c37`.
 An independent hash of the copied image matched the build output.
 [Build record](test-results/application-build.json),
-[checksum](test-results/application-iso.sha256). A separate
-[BIOS live-boot smoke test](test-results/application-bios-live.json) passed,
+[checksum](test-results/application-iso.sha256). The previous application
+candidate also passed a separate [BIOS live-boot smoke test](test-results/application-bios-live.json) passed,
 checking Linux, desktop/installer processes and Determinate Nix startup. This
 process check does not claim rendered GUI readiness or an installed-system boot.
 
@@ -144,8 +144,9 @@ passes did not expose that timing condition.
 The installer now allows 120 seconds for root/EFI filesystem module loading,
 reports filesystem preparation in its progress text, and preserves the
 underlying error with an explicit statement that no disk writes occurred.
-A regression test checks both root and EFI module failures. The ISO must be
-rebuilt and retested with this fix before release.
+A regression test checks both root and EFI module failures. The corrected ISO
+has been rebuilt and its full installation matrix is in progress. The original
+[rejected build record](test-results/application-rejected-build.json) is retained.
 
 The full-install harness also allows both of the installer's separate
 two-hour preparation and installation deadlines, plus test overhead. Its former
