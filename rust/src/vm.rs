@@ -133,8 +133,8 @@ fn filesystem(value: &str, allow_blank: bool) -> Result<String> {
 fn acceleration() -> Result<String> {
     let value = std::env::var("RESPIN_QEMU_ACCEL").unwrap_or_else(|_| "kvm".into());
     ensure!(
-        ["kvm", "tcg"].contains(&value.as_str()),
-        "RESPIN_QEMU_ACCEL must be kvm or tcg"
+        ["kvm", "tcg", "tcg-single"].contains(&value.as_str()),
+        "RESPIN_QEMU_ACCEL must be kvm, tcg or tcg-single"
     );
     Ok(value)
 }
@@ -177,7 +177,7 @@ impl Vm {
         }
         let accelerator = acceleration()?;
         let machine = format!(
-            "q35,accel={accelerator},vmport=off,i8042={}",
+            "q35,vmport=off,i8042={}",
             if input == InputDevices::Usb {
                 "off"
             } else {
@@ -195,8 +195,14 @@ impl Vm {
                 // Isolate each input path: USB runs have no emulated PS/2
                 // controller; PS/2 runs have no VMware absolute-pointer shim.
                 &machine,
+                "-accel",
+                if accelerator == "tcg-single" {
+                    "tcg,thread=single"
+                } else {
+                    &accelerator
+                },
                 "-cpu",
-                if accelerator == "tcg" { "max" } else { "host" },
+                if accelerator == "kvm" { "host" } else { "max" },
                 "-smp",
                 "4",
                 "-m",
@@ -302,7 +308,7 @@ impl Vm {
     }
     pub fn wait_agent(&mut self) -> Result<()> {
         let deadline =
-            Instant::now() + Duration::from_secs(if acceleration()? == "tcg" { 900 } else { 240 });
+            Instant::now() + Duration::from_secs(if acceleration()? == "kvm" { 240 } else { 900 });
         let mut last = String::new();
         while Instant::now() < deadline {
             ensure!(
@@ -738,6 +744,7 @@ pub fn boot_installed(args: Vec<String>) -> Result<()> {
     }
     result["resumed_from"] = json!(args[0]);
     result["disk_only_boot"] = json!(true);
+    result["qemu_acceleration"] = json!(acceleration()?);
     result["implementation"] = json!("native-rust");
     let fixture = fixture(&repo)?;
     let mut vm = Vm::start_with_devices(

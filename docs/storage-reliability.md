@@ -88,6 +88,9 @@ For hosts without KVM, set `RESPIN_QEMU_ACCEL=tcg`. This uses QEMU's emulated
 CPU and allows up to 15 minutes for the guest agent to start; the installation
 assertions are unchanged. Set `OVMF_CODE` and `OVMF_VARS` to the firmware files
 provided by the host's QEMU package. The result records the chosen accelerator.
+`RESPIN_QEMU_ACCEL=tcg-single` keeps four virtual CPUs but runs their emulation
+on one host thread. It is slower and can isolate multicore-emulation failures
+without changing the ISO or installed system.
 
 ## Validation on 2026-10-04
 
@@ -137,8 +140,15 @@ Completed in a disposable Linux container on the macOS development host
   successful outputs were exported back into the build store; no checks were
   removed to produce the ISO. Upstream skips and disabled tests remain recorded
   in the [test summary](test-results/filesystem-build-tests.log).
-- The first candidate's actual GTK filesystem menu was opened and visually checked:
+- The corrected ISO's actual GTK filesystem menu was opened and visually checked:
   [ext4, Btrfs and XFS choices](test-results/filesystem-choices.png).
+- The corrected NVMe/ext4 installation booted without the ISO, accepted the
+  test user's password at the graphical login screen, displayed Plasma and
+  responded to opening its application menu. The unchanged installed-system
+  checks passed again after login, followed by a clean shutdown.
+  [Result](test-results/filesystem-installed-gui.json),
+  [login screen](test-results/filesystem-installed-login.png),
+  [desktop and application menu](test-results/filesystem-installed-desktop.png).
 
 UBS was also run and reviewed. It is not a clean scanner gate: its five existing
 critical matches flag the fixed-command wrapper, synthetic unit-test password,
@@ -163,8 +173,24 @@ evaluation matrix now injects incorrect detected root/EFI identities and
 asserts that the generated configuration overrides both. Reused-disk fixtures
 also seed an earlier EFI UUID (`0000-0001`).
 
+During a corrected-ISO NVMe install, the deliberately seeded `0000-0001` alias
+still pointed at the EFI partition, alongside its new `171D-97F1` alias. The
+installer's generated configuration used `171D-97F1`, matching the uncached
+superblock probe. This directly exercises the condition that broke the first
+candidate. [Live crosscheck](test-results/filesystem-uuid-live-crosscheck.log).
+
 [Failure record](test-results/filesystem-uuid-rejection.json) and
 [boot screenshot](test-results/filesystem-uuid-rejection.png).
+
+One corrected-image disk-only boot under QEMU 11.1.2's multicore TCG mode
+panicked before loading any modules or mounting the root filesystem. It raised
+`int3` in `sched_clock_cpu` while the reported instruction bytes were a NOP.
+This matches the symptom described in the
+[kernel/QEMU discussion of stale translated instructions](https://lkml.rescloud.iu.edu/hypermail/linux/kernel/2307.0/04274.html);
+the match is an inference, not a diagnosis of the physical laptop. The
+[original panic log](test-results/filesystem-mttcg-panic.log) is retained. The
+same installed disk then booted successfully and passed the unchanged
+filesystem, authentication and service checks with single-threaded TCG.
 
 Outstanding release evidence: the corrected ISO's ten complete-ISO
 install/reboot cases, written-USB checks and the user's physical NVMe retest.
