@@ -74,8 +74,9 @@ pub fn main(args: Vec<String>) -> Result<()> {
     );
     regular(&work.join("target.raw"))?;
     ensure!(
-        fs::metadata(work.join("target.raw"))?.len() == 40 * 1024u64.pow(3),
-        "Not a 40 GiB test image"
+        [40 * 1024u64.pow(3), 80 * 1024u64.pow(3)]
+            .contains(&fs::metadata(work.join("target.raw"))?.len()),
+        "Not a 40 or 80 GiB test image"
     );
     let mut qmp = Rpc::connect(&work.join("qmp.sock"), true, 20)?;
     match args[1].as_str() {

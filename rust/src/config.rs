@@ -41,10 +41,24 @@ fn template(source: &str, lock: &str) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Missing inputs"))?;
     ensure!(
         inputs.keys().map(String::as_str).collect::<BTreeSet<_>>()
-            == BTreeSet::from(["nixpkgs", "determinate", "fh"]),
+            == BTreeSet::from([
+                "nixpkgs",
+                "determinate",
+                "fh",
+                "applications",
+                "ai-apps",
+                "omp"
+            ]),
         "Unexpected target inputs"
     );
-    for name in ["nixpkgs", "determinate", "fh"] {
+    for name in [
+        "nixpkgs",
+        "determinate",
+        "fh",
+        "applications",
+        "ai-apps",
+        "omp",
+    ] {
         let node = inputs[name]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Expected direct locked input"))?;

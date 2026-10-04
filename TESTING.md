@@ -1,5 +1,10 @@
 # Parsed-plan installer verification
 
+**Current application work:** [optional applications](docs/applications.md)
+describes the catalog, source pins, pre-erasure preparation and the additional
+configuration and installed-system tests. Application-enabled ISO results are
+recorded separately from the earlier filesystem-only image below.
+
 **Current storage work:** the user reported a root mount failure on a ThinkPad
 X1 Carbon Gen 14 NVMe. See [storage reliability](docs/storage-reliability.md)
 for the fix, filesystem choices, tests, and outstanding final-ISO/hardware checks.

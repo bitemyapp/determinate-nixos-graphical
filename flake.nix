@@ -5,6 +5,10 @@
   inputs.nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1";
   inputs.determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
   inputs.fh.url = "https://flakehub.com/f/DeterminateSystems/fh/*.tar.gz";
+  # Application updates are independent of the already-tested base system.
+  inputs.applications.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.ai-apps.url = "github:numtide/llm-agents.nix";
+  inputs.omp.url = "github:can1357/oh-my-pi/v18.6.1";
 
   outputs =
     inputs@{
@@ -19,6 +23,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
       tools = import ./nix/tools.nix { inherit pkgs; };
       calamares = import ./nix/calamares.nix { inherit pkgs; };
+      applicationCatalog = import ./nix/applications.nix { inherit inputs calamares; };
       installer = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
@@ -47,6 +52,7 @@
         default = self.packages.${system}.iso;
         iso = installer.config.system.build.isoImage;
         inherit tools calamares;
+        application-cache = applicationCatalog.cache;
         # Exported separately for isolated Wi-Fi regression tests, not shipped
         # in the public ISO or installed as a live access-point service.
         wifi-test-tools = pkgs.symlinkJoin {
@@ -62,6 +68,8 @@
       checks.${system} = {
         native-installer = calamares;
         storage = calamares.storageTest;
+        applications = applicationCatalog.check;
+        application-cache = applicationCatalog.cache;
         live-profiles =
           let
             normal = installer.config;

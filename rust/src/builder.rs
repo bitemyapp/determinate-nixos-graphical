@@ -392,7 +392,7 @@ pub fn build_iso(rebuild: bool) -> Result<()> {
         fs::read_to_string("/sys/class/block/vda/serial")?.trim() == "RESPIN_BUILDER_ONLY",
         "Not the builder VM"
     );
-    check_desktops()?;
+    check_selections()?;
     run(Command::new("nix")
         .current_dir("/workspace")
         .env("TMPDIR", "/build/tmp")
@@ -497,7 +497,12 @@ fn export_wifi_tools() -> Result<()> {
     Ok(())
 }
 
-fn check_desktops() -> Result<()> {
+pub fn check_selections() -> Result<()> {
+    check_configurations("desktop", 47, 4)?;
+    check_configurations("application", 34, 1)
+}
+
+fn check_configurations(kind: &str, expected: usize, jobs: usize) -> Result<()> {
     let repo = Path::new("/workspace");
     let pin: serde_json::Value =
         serde_json::from_slice(&fs::read(repo.join("nix/calamares-source.json"))?)?;
@@ -510,32 +515,36 @@ fn check_desktops() -> Result<()> {
         .join(".work/native-fixture")
         .join(rev)
         .join("bin/calamares-vm-fixture");
-    let configurations = output(Command::new(fixture).arg("desktop-configurations"))?;
+    let configurations = output(Command::new(fixture).arg(format!("{kind}-configurations")))?;
     let cases: std::collections::BTreeMap<String, String> = serde_json::from_str(&configurations)?;
     ensure!(
-        cases.len() == 47,
-        "Expected all 47 supported desktop combinations"
+        cases.len() == expected,
+        "Expected all {expected} supported {kind} configurations"
     );
-    let path = repo.join(".work/desktop-configurations.json");
+    let path = repo.join(format!(".work/{kind}-configurations.json"));
     fs::write(&path, configurations)?;
-    let modules = repo.join(".work/desktop-modules");
+    let modules = repo.join(format!(".work/{kind}-modules"));
     fs::create_dir_all(&modules)?;
     for (name, source) in &cases {
         ensure!(
             name.bytes().all(|c| c.is_ascii_lowercase() || c == b'-'),
-            "Invalid desktop case name"
+            "Invalid configuration case name"
         );
-        let source = source.replace("imports = [ ./hardware-configuration.nix ];", "");
+        let source = source.replace(
+            "imports = [ ./hardware-configuration.nix ./applications.nix ];",
+            "",
+        );
         let mut file = File::create(modules.join(format!("{name}.nix")))?;
         file.write_all(source.as_bytes())?;
         file.sync_all()?;
     }
-    let cache = repo.join("artifacts/native-rust/desktop-matrix.json");
+    let cache = repo.join(format!("artifacts/native-rust/{kind}-matrix.json"));
+    let expression = format!("tests/{kind}-matrix.nix");
     let fingerprint = format!(
         "{}:{}:{}",
         sha256(&path)?,
         sha256(&repo.join("flake.lock"))?,
-        sha256(&repo.join("tests/desktop-matrix.nix"))?
+        sha256(&repo.join(&expression))?
     );
     if fs::read(&cache)
         .ok()
@@ -548,29 +557,36 @@ fn check_desktops() -> Result<()> {
         })
     {
         println!(
-            "PASS: cached desktop evaluations match the current generated configurations, test expression and pinned lock"
+            "PASS: cached {kind} evaluations match the current generated configurations, test expression and pinned lock"
         );
         return Ok(());
     }
     let mut results = std::collections::BTreeMap::<String, serde_json::Value>::new();
     let names: Vec<_> = cases.keys().collect();
-    // Four independent evaluations fit in the 12-GiB builder. Keep bounded
-    // parallelism rather than spawning one evaluator per desktop combination.
-    for batch in names.chunks(4) {
+    // Application cases import several package sets; evaluate those one at a
+    // time. Desktop-only configurations can retain bounded parallelism.
+    for batch in names.chunks(jobs) {
         let evaluated = thread::scope(|scope| -> Result<Vec<(String, serde_json::Value)>> {
-            let jobs: Vec<_> = batch.iter().map(|name| scope.spawn(move || -> Result<_> {
-                ensure!(name.bytes().all(|c| c.is_ascii_lowercase() || c == b'-'), "Invalid desktop case name");
-                println!("Evaluating desktop selection: {name}");
-                let apply = format!("f: f {{ configurations = \"/workspace/.work/desktop-configurations.json\"; caseName = \"{name}\"; }}");
-                let result = output(Command::new("nix").current_dir(repo).args([
-                    "eval", "--impure", "--json", "--file", "tests/desktop-matrix.nix", "--apply", &apply,
-                ]))?;
-                Ok(((*name).clone(), serde_json::from_str(&result)?))
-            })).collect();
+            let jobs: Vec<_> = batch
+                .iter()
+                .map(|name| {
+                    let expression = &expression;
+                    scope.spawn(move || -> Result<_> {
+                        println!("Evaluating {kind} selection: {name}");
+                        let apply = format!(
+                            "f: f {{ configurations = \"/workspace/.work/{kind}-configurations.json\"; caseName = \"{name}\"; }}"
+                        );
+                        let result = output(Command::new("nix").current_dir(repo).args([
+                            "eval", "--impure", "--json", "--file", expression, "--apply", &apply,
+                        ]))?;
+                        Ok(((*name).clone(), serde_json::from_str(&result)?))
+                    })
+                })
+                .collect();
             jobs.into_iter()
                 .map(|job| {
                     job.join()
-                        .map_err(|_| anyhow::anyhow!("Desktop evaluator worker panicked"))?
+                        .map_err(|_| anyhow::anyhow!("Configuration evaluator worker panicked"))?
                 })
                 .collect()
         })?;
@@ -582,7 +598,7 @@ fn check_desktops() -> Result<()> {
             &serde_json::json!({"fingerprint":fingerprint,"installer_revision":rev,"cases":results}),
         )?,
     )?;
-    println!("PASS: all 47 supported desktop combinations evaluate against pinned NixOS");
+    println!("PASS: all {expected} supported {kind} configurations evaluate against pinned NixOS");
     Ok(())
 }
 

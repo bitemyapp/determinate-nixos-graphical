@@ -441,6 +441,7 @@ fn verify_installed(
     fixture: &str,
     graphical_login: bool,
     filesystem: &str,
+    applications: &str,
 ) -> Result<String> {
     vm.wait_agent()?;
     vm.execute("for i in $(seq 1 90); do systemctl is-active --quiet display-manager && exit 0; sleep 1; done; exit 1", SHORT)?;
@@ -450,8 +451,9 @@ fn verify_installed(
     )?;
     let output = vm.execute(
         &format!(
-            "CALAMARES_TEST_FILESYSTEM={} {} verify",
+            "CALAMARES_TEST_FILESYSTEM={} CALAMARES_TEST_APPLICATIONS={} {} verify",
             shell_quote(filesystem),
+            shell_quote(applications),
             shell_quote(fixture)
         ),
         Duration::from_secs(180),
@@ -519,11 +521,24 @@ pub fn main(args: Vec<String>) -> Result<()> {
     let mut root_filesystem = "ext4".to_string();
     let mut previous_filesystem = None;
     let mut gui = false;
+    let mut applications = "firefox".to_string();
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--firmware" => firmware = args.next().context("Missing firmware")?,
             "--install" => install = true,
+            "--applications" => {
+                applications = args.next().context("Missing applications")?;
+                ensure!(
+                    !applications.is_empty()
+                        && applications.len() < 1024
+                        && applications.bytes().all(|c| c.is_ascii_lowercase()
+                            || c.is_ascii_digit()
+                            || c == b'-'
+                            || c == b','),
+                    "Invalid application selection"
+                );
+            }
             "--disk-bus" => disk_bus = DiskBus::parse(&args.next().context("Missing disk bus")?)?,
             "--filesystem" => {
                 root_filesystem = filesystem(&args.next().context("Missing filesystem")?, false)?
@@ -552,7 +567,7 @@ pub fn main(args: Vec<String>) -> Result<()> {
         !gui || previous_filesystem == "blank",
         "GUI tests require --previous-filesystem blank; backend tests seed prior filesystems"
     );
-    let iso = regular(&iso.context("Usage: qemu_test.rs ISO [--firmware bios|uefi] [--install] [--disk-bus virtio|nvme|nvme4k] [--filesystem ext4|btrfs|xfs] [--previous-filesystem blank|ext4|btrfs|xfs]")?)?;
+    let iso = regular(&iso.context("Usage: qemu_test.rs ISO [--firmware bios|uefi] [--install] [--disk-bus virtio|nvme|nvme4k] [--filesystem ext4|btrfs|xfs] [--previous-filesystem blank|ext4|btrfs|xfs] [--applications all|none|ID,ID]")?)?;
     let digest = sha256(&iso)?;
     let repo = repo()?;
     let name = format!(
@@ -567,12 +582,19 @@ pub fn main(args: Vec<String>) -> Result<()> {
     fs::create_dir(&work)?;
     fs::create_dir(&artifacts)?;
     let disk = work.join("target.raw");
+    let disk_size_gib = if applications == "firefox" || applications == "none" {
+        40u64
+    } else {
+        80
+    };
     if install {
-        sparse(&disk, 40 * 1024u64.pow(3))?;
+        sparse(&disk, disk_size_gib * 1024u64.pow(3))?;
     }
     let fixture = if install { Some(fixture(&repo)?) } else { None };
     let pin: Value = serde_json::from_slice(&fs::read(repo.join("nix/calamares-source.json"))?)?;
     let mut result = json!({"firmware":firmware,"media":"usb-storage","iso":iso.file_name().unwrap().to_string_lossy(),"iso_sha256":digest,"install":install,"gui":gui,"passed":false,"implementation":"native-rust","installer_revision":pin["rev"],"disk_bus":disk_bus.name(),"filesystem":root_filesystem,"previous_filesystem":previous_filesystem,"qemu_acceleration":acceleration()?});
+    result["applications"] = json!(applications);
+    result["disk_size_gib"] = json!(disk_size_gib);
     let mut vm = Vm::start_with_devices(
         &work,
         &firmware,
@@ -637,8 +659,8 @@ pub fn main(args: Vec<String>) -> Result<()> {
                 // The fixture is shared from the host, never shipped on the ISO.
                 vm.execute(
                     &format!(
-                        "CALAMARES_TEST_FILESYSTEM={} CALAMARES_TEST_PREVIOUS_FILESYSTEM={} {} install > {} 2>&1",
-                        shell_quote(&root_filesystem), shell_quote(&previous_filesystem), shell_quote(fixture),
+                        "CALAMARES_TEST_FILESYSTEM={} CALAMARES_TEST_PREVIOUS_FILESYSTEM={} CALAMARES_TEST_APPLICATIONS={} {} install > {} 2>&1",
+                        shell_quote(&root_filesystem), shell_quote(&previous_filesystem), shell_quote(&applications), shell_quote(fixture),
                         shell_quote(&format!("/workspace/artifacts/{name}/install.log"))
                     ),
                     Duration::from_secs(7500),
@@ -663,8 +685,15 @@ pub fn main(args: Vec<String>) -> Result<()> {
                 disk_bus,
             )?;
             println!("Booting the installed disk with no ISO attached");
-            let installed =
-                verify_installed(&mut vm, &artifacts, &repo, fixture, gui, &root_filesystem)?;
+            let installed = verify_installed(
+                &mut vm,
+                &artifacts,
+                &repo,
+                fixture,
+                gui,
+                &root_filesystem,
+                &applications,
+            )?;
             let installed_kernel = vm.execute("uname -r", SHORT)?.trim().to_owned();
             ensure!(
                 installed_kernel == live_kernel,
@@ -716,7 +745,7 @@ pub fn boot_installed(args: Vec<String>) -> Result<()> {
     let root_filesystem = filesystem(result["filesystem"].as_str().unwrap_or("ext4"), false)?;
     let disk = regular(&previous_work.join("target.raw"))?;
     ensure!(
-        fs::metadata(&disk)?.len() == 40 * 1024u64.pow(3),
+        [40 * 1024u64.pow(3), 80 * 1024u64.pow(3)].contains(&fs::metadata(&disk)?.len()),
         "Wrong test disk size"
     );
     // Keep AF_UNIX socket paths short; lineage is recorded in resumed_from.
@@ -758,12 +787,24 @@ pub fn boot_installed(args: Vec<String>) -> Result<()> {
     )?;
     println!("Booting installed {firmware} disk; no ISO attached");
     let gui = result["gui"] == true;
-    let outcome = verify_installed(&mut vm, &artifacts, &repo, &fixture, gui, &root_filesystem)
-        .and_then(|text| {
-            println!("{text}");
-            result["installed"] = json!(text);
-            vm.poweroff()
-        });
+    let applications = result["applications"]
+        .as_str()
+        .unwrap_or("firefox")
+        .to_owned();
+    let outcome = verify_installed(
+        &mut vm,
+        &artifacts,
+        &repo,
+        &fixture,
+        gui,
+        &root_filesystem,
+        &applications,
+    )
+    .and_then(|text| {
+        println!("{text}");
+        result["installed"] = json!(text);
+        vm.poweroff()
+    });
     record(vm, &work, &artifacts, &mut result, outcome)
 }
 

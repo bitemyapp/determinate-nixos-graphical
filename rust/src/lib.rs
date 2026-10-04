@@ -10,7 +10,9 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         let usage = match command {
             "build-rootless" => "BOOTSTRAP_ISO [--sha256 HEX] [--rebuild-iso]",
-            "qemu-test" => "ISO [--firmware bios|uefi] [--install] [--gui]",
+            "qemu-test" => {
+                "ISO [--firmware bios|uefi] [--install] [--gui] [--disk-bus virtio|nvme|nvme4k] [--filesystem ext4|btrfs|xfs] [--previous-filesystem blank|ext4|btrfs|xfs] [--applications all|none|ID,ID]"
+            }
             "live-test" => {
                 "ISO [--firmware bios|uefi] [--profile default|compatibility|lts] [--input usb|ps2]"
             }
@@ -18,6 +20,7 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
             "wifi-test" => "ISO [--profile default|compatibility|lts]",
             "boot-installed" => "RUN-NAME",
             "check-config" => "template|settings FILE FILE",
+            "check-selections" => "(inside the /workspace build environment)",
             _ => "(run only inside the disposable guest)",
         };
         println!("Usage: {command} {usage}");
@@ -41,6 +44,10 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
         "qmp-input" => gui_input::main(args),
         "boot-installed" => vm::boot_installed(args),
         "check-config" => config::main(args),
+        "check-selections" => {
+            anyhow::ensure!(args.is_empty(), "Usage: check-selections");
+            builder::check_selections()
+        }
         _ => anyhow::bail!("Unknown command: {command}"),
     }
 }

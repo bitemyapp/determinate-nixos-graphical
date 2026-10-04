@@ -10,6 +10,7 @@
 let
   calamares = import ../nix/calamares.nix { inherit pkgs; };
   diagnostics = import ../nix/live-diagnostics.nix { inherit pkgs; };
+  applicationCatalog = import ../nix/applications.nix { inherit inputs calamares; };
   settings =
     kernel:
     builtins.toJSON {
@@ -160,6 +161,9 @@ in
     '';
   };
   isoImage.squashfsCompression = "zstd -Xcompression-level 6";
+  # Keep optional packages in the read-only store, without adding them to the
+  # live session. Preflight can realize any selection without filling live RAM.
+  isoImage.storeContents = [ applicationCatalog.cache ];
   boot.kernelParams = [
     "console=ttyS0,115200n8"
     "console=tty0"
