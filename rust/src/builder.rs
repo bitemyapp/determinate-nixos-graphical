@@ -61,15 +61,19 @@ fn boot_entry(config: &str) -> Result<(String, String, String)> {
 pub fn main(args: Vec<String>) -> Result<()> {
     let mut iso = None;
     let mut expected = BOOTSTRAP_SHA256.to_string();
+    let mut rebuild_iso = false;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--sha256" => expected = args.next().context("Missing SHA-256")?,
+            "--rebuild-iso" => rebuild_iso = true,
             text if !text.starts_with('-') && iso.is_none() => iso = Some(PathBuf::from(text)),
             _ => bail!("Unknown argument: {arg}"),
         }
     }
-    let iso = regular(&iso.context("Usage: build_rootless.rs BOOTSTRAP_ISO [--sha256 HEX]")?)?;
+    let iso = regular(
+        &iso.context("Usage: build_rootless.rs BOOTSTRAP_ISO [--sha256 HEX] [--rebuild-iso]")?,
+    )?;
     ensure!(sha256(&iso)? == expected, "Bootstrap ISO SHA-256 mismatch");
     OpenOptions::new()
         .read(true)
@@ -298,7 +302,8 @@ pub fn main(args: Vec<String>) -> Result<()> {
             artifacts.join("build.log").display()
         );
         let log = File::create(artifacts.join("build.log"))?;
-        let build_result = run(ssh(&format!("{GUEST_TOOL} build-iso"))
+        let rebuild = if rebuild_iso { " --rebuild" } else { "" };
+        let build_result = run(ssh(&format!("{GUEST_TOOL} build-iso{rebuild}"))
             .stdout(log.try_clone()?)
             .stderr(log));
         // The builder's store is persistent: even a failed build must flush
@@ -382,7 +387,7 @@ pub fn prepare() -> Result<()> {
     Ok(())
 }
 
-pub fn build_iso() -> Result<()> {
+pub fn build_iso(rebuild: bool) -> Result<()> {
     ensure!(
         fs::read_to_string("/sys/class/block/vda/serial")?.trim() == "RESPIN_BUILDER_ONLY",
         "Not the builder VM"
@@ -392,7 +397,8 @@ pub fn build_iso() -> Result<()> {
         .current_dir("/workspace")
         .env("TMPDIR", "/build/tmp")
         .args(["flake", "check", "--no-update-lock-file", "-L"]))?;
-    run(Command::new("nix")
+    let mut build = Command::new("nix");
+    build
         .current_dir("/workspace")
         .env("TMPDIR", "/build/tmp")
         .args([
@@ -406,7 +412,11 @@ pub fn build_iso() -> Result<()> {
             "--max-jobs",
             "2",
             "-L",
-        ]))?;
+        ]);
+    if rebuild {
+        build.arg("--rebuild");
+    }
+    run(&mut build)?;
     let dest = Path::new("/workspace/artifacts/native-rust");
     fs::create_dir_all(dest)?;
     let mut found = false;

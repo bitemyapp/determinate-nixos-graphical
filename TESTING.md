@@ -3,6 +3,8 @@
 This report concerns `codex/rust-calamares-integration` and the "parse, don't
 validate" refactor. The preceding report is preserved in
 [docs/testing-b746056.md](docs/testing-b746056.md) with its original evidence.
+The subsequent fresh rebuild, disk cleanup and physical USB deployment are
+recorded separately in [docs/usb-verification.md](docs/usb-verification.md).
 
 ## Exact image
 
@@ -19,8 +21,9 @@ validate" refactor. The preceding report is preserved in
 The host independently hashed the image and matched the builder's sidecar.
 This identifies custom tested bytes, not a vendor signature. Nix verified the
 source hash and retained normal package verification. The expected source-hash
-bootstrap mismatch is preserved in `artifacts/native-rust/source-hash-bootstrap-d2fd201.log`.
-The preceding image remains under `artifacts/native-rust-680c510/`.
+bootstrap mismatch is preserved in `artifacts/native-rust-pre-usb/source-hash-bootstrap-d2fd201.log`.
+Older local images and obsolete disposable disks were removed during the
+2026-10-04 cleanup; historical logs, screenshots and published evidence remain.
 
 ## Parsing contracts and build checks
 
@@ -114,4 +117,5 @@ GPT/ext4 and network access remain required. Manual partitioning, dual boot,
 encryption, offline installation and upstream plugin parity remain unsupported.
 Only the LTS kernel is installed end to end.
 
-No host Wi-Fi credentials, host sudo, physical USB writes or host reboot were used.
+The parsed-plan tests above used no host Wi-Fi credentials, host sudo, physical
+USB writes or host reboot. The subsequent USB deployment is documented separately.

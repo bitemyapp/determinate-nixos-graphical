@@ -48,7 +48,7 @@ impl Rpc {
         )?;
         Ok(id)
     }
-    fn request_shutdown(&mut self) -> Result<()> {
+    pub fn request_shutdown(&mut self) -> Result<()> {
         // guest-shutdown deliberately has no success response. Vm::poweroff
         // confirms success by waiting for QEMU to exit with status zero.
         // https://www.qemu.org/docs/master/interop/qemu-ga-ref.html#command-guest-shutdown
