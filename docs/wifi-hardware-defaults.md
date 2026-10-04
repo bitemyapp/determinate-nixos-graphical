@@ -144,19 +144,52 @@ Assertions cover:
   unchanged. No personal host credentials were used.
 - Chicago, including winter CST and summer CDT.
 
-### Samsung deployment: pending authorization
+### Samsung deployment
 
 Read-only identification confirmed the unmounted Samsung Flash Drive, serial
 ending **3525**, capacity **32,080,200,192 bytes**, at its exact by-id path.
-The single Polkit authorization attempt failed at **00:45:42 America/Chicago**.
+The initial Polkit authorization attempt failed at **00:45:42 America/Chicago**.
 The deployment process exited with status 143 before the writer started;
-`.work/usb-wifi-final/` remains empty. No USB bytes were written by this attempt.
+no USB bytes were written by that attempt. The user explicitly authorized a
+retry, and the next single authorization succeeded.
 
-The Samsung still contains the preceding `a06e8605…` image. **The new ISO has
-not been reflashed or booted from the physical device.** Do not treat the prior
-image's USB results as evidence for this build. A successful authorization is
-still needed for the identity-pinned write, complete byte/hash read-back and
-direct read-only UEFI/BIOS device boots. The internal NVMe is never a write target.
+The Samsung now contains the final `26444afb…` image, replacing `a06e8605…`.
+The helper checked vendor/model/serial, capacity, removable USB transport,
+mount state and holders before opening the exact device exclusively. The
+internal NVMe was not a target.
+
+All **3,989,078,016 bytes** were written and synchronized. The final 1 MiB of
+the device was cleared of stale backup partition metadata; this was not a
+secure erase of unused space. After invalidating the block cache, the helper
+read back and compared every ISO byte and verified SHA-256
+`26444afb6b01cc35b6e226de06308ba3301570888afe0ef4ab139d9b7b1f5ef5`.
+The [read-back evidence](test-results/wifi-usb-readback.json) records the
+matching size/hash and successful byte comparison. Kernel partition-table
+refresh succeeded.
+
+Both following tests booted the **physical Samsung device**, not the ISO file:
+
+| Firmware | Result | Inspected screenshot |
+| --- | --- | --- |
+| OVMF UEFI | [PASS](test-results/wifi-usb-uefi.json) | [Plasma and Rust installer](images/wifi-usb-uefi.png) |
+| SeaBIOS | [PASS](test-results/wifi-usb-bios.json) | [Plasma and Rust installer](images/wifi-usb-bios.png) |
+
+Both reached a live tmpfs root with the expected ISO9660 and FAT `EFIBOOT`
+partitions, active display manager, Plasma, the Rust installer and Determinate
+Nix. Media settings reported `kernel: latest` and `test_diagnostics: false`.
+Both guests shut down cleanly. These are default-profile physical-media boot
+checks; the three-profile simulated-radio tests above used the byte-identical
+ISO file.
+
+The successful authorization covered writing, complete read-back and both
+boots. Before starting QEMU, the helper permanently dropped root and
+supplementary groups and enabled `no_new_privs`. QEMU ran as UID 1000 with only
+a read-only media descriptor, no host system disk and no installation target.
+QMP independently confirmed the full Samsung capacity and read-only status.
+No persistent permission rules were changed.
+
+Raw evidence is retained in `.work/usb-wifi-final/`. The Samsung was left
+unmounted, all test VMs stopped, and the host was not rebooted.
 
 ## Remaining physical test
 
