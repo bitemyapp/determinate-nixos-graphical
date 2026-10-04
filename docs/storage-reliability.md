@@ -1,5 +1,8 @@
 # Filesystem selection and NVMe mount reliability
 
+This report records the filesystem-only image. The newer application-enabled
+image and its separate validation are recorded in [optional applications](applications.md).
+
 On 2026-10-04 the user reported `mount` exit status 32 on
 `/dev/nvme0n1p2` during installation on a ThinkPad X1 Carbon Gen 14.
 The screenshot shows failure at the root mount stage, after the ext4 formatter

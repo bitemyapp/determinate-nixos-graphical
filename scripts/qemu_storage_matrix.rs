@@ -1,5 +1,6 @@
 #!/usr/bin/env -S rust-script --force
 //! Complete ISO installs over previously formatted disks, followed by disk-only boots.
+//! Includes all applications, no applications, and Rustup's build-tools dependency.
 //!
 //! ```cargo
 //! [dependencies]
@@ -11,6 +12,12 @@ fn main() -> anyhow::Result<()> {
     anyhow::ensure!(args.len() == 1, "Usage: qemu_storage_matrix.rs ISO");
     for (firmware, bus) in [("uefi", "nvme"), ("uefi", "nvme4k"), ("bios", "virtio")] {
         for (filesystem, previous) in [("ext4", "btrfs"), ("btrfs", "xfs"), ("xfs", "ext4")] {
+            let applications = match (firmware, bus, filesystem) {
+                ("uefi", "nvme", "ext4") => "all",
+                ("uefi", "nvme4k", "ext4") => "rustup",
+                ("bios", "virtio", "ext4") => "none",
+                _ => "firefox",
+            };
             respin_tools::dispatch(
                 "qemu-test",
                 vec![
@@ -24,6 +31,8 @@ fn main() -> anyhow::Result<()> {
                     filesystem.into(),
                     "--previous-filesystem".into(),
                     previous.into(),
+                    "--applications".into(),
+                    applications.into(),
                 ],
             )?;
         }

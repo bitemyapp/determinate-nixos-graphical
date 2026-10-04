@@ -76,8 +76,10 @@ The pinned Linux `calamares-vm-fixture` must first exist under
 `.work/native-fixture/<revision>/bin`. Each configuration evaluates in its own
 Nix process to bound memory usage.
 
-The full ISO runner accepts `--applications all`, `none`, or comma-separated
-catalog IDs. Additional application selections use an 80 GiB disposable disk;
+The standard `scripts/qemu_storage_matrix.rs` release matrix now includes
+all-applications, no-applications and Rustup-only selections within its ten
+filesystem/controller cases. The full ISO runner also accepts
+`--applications all`, `none`, or comma-separated catalog IDs. Additional application selections use an 80 GiB disposable disk;
 Firefox-only and empty selections retain the 40 GiB disk. After booting without
 the ISO, the fixture compares the installed manifest and verifies package paths.
 
@@ -114,6 +116,14 @@ this isolates UI checks from the still-pending new image validation.
 [proprietary opt-out](images/applications-proprietary-disabled.png),
 [Docker option](images/applications-docker.png).
 
-The complete application package builds, new ISO installation/runtime tests and
-SanDisk write/read-back are still pending; the old filesystem-only image has
-not been flashed as a substitute.
+All selected application packages built successfully, including their upstream
+install checks. The complete Nix flake checks passed. The rebuilt ISO is
+9,560,502,272 bytes with SHA-256
+`231a39d4501b62dcaf721851861a1f8589f3ef364dc95177d30d52fdd5e0eff0`.
+An independent hash of the copied image matched the build output.
+[Build record](test-results/application-build.json),
+[checksum](test-results/application-iso.sha256).
+
+The new ISO installation/runtime tests and SanDisk write/read-back are still
+pending. The earlier filesystem-only image was archived and was never written
+to this SanDisk.
