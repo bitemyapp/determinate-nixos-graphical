@@ -114,7 +114,9 @@ this isolates UI checks from the still-pending new image validation.
 [menu](images/applications-menu.png),
 [Rustup dependency](images/applications-rustup-dependency.png),
 [proprietary opt-out](images/applications-proprietary-disabled.png),
-[Docker option](images/applications-docker.png).
+[Docker option](images/applications-docker.png). The rebuilt image also rendered
+the [application menu](images/applications-final-iso-menu.png) during its own
+full installation tests.
 
 All selected application packages built successfully, including their upstream
 install checks. The complete Nix flake checks passed. The rebuilt ISO is
