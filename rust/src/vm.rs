@@ -122,6 +122,8 @@ impl Vm {
             .args([
                 "-name",
                 "determinate-respin-test",
+                "-smbios",
+                "type=1,serial=RESPIN_VM_ONLY",
                 "-machine",
                 // Isolate each input path: USB runs have no emulated PS/2
                 // controller; PS/2 runs have no VMware absolute-pointer shim.

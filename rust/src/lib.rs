@@ -4,6 +4,7 @@ pub mod gui_input;
 pub mod live_test;
 pub mod support;
 pub mod vm;
+pub mod wifi_test;
 
 pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
@@ -14,6 +15,7 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
                 "ISO [--firmware bios|uefi] [--profile default|compatibility|lts] [--input usb|ps2]"
             }
             "qmp-input" => "RUN-NAME screenshot|key|type|click [VALUES]",
+            "wifi-test" => "ISO [--profile default|compatibility|lts]",
             "boot-installed" => "RUN-NAME",
             "check-config" => "template|settings FILE FILE",
             _ => "(run only inside the disposable guest)",
@@ -34,6 +36,8 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
         }
         "qemu-test" => vm::main(args),
         "live-test" => live_test::main(args),
+        "wifi-test" => wifi_test::main(args),
+        "guest-wifi-test" => wifi_test::guest(),
         "qmp-input" => gui_input::main(args),
         "boot-installed" => vm::boot_installed(args),
         "check-config" => config::main(args),

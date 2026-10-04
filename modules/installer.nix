@@ -65,8 +65,17 @@ in
       }
     });
   '';
-  networking.wireless.enable = lib.mkForce false;
+  # NetworkManager enables wpa_supplicant in D-Bus-controlled mode. Forcing
+  # wireless.enable off removes that backend, leaving even working radios
+  # unavailable. Do not run a separate, competing wireless manager.
   networking.networkmanager.enable = true;
+  networking.networkmanager.wifi.backend = "wpa_supplicant";
+  hardware.enableRedistributableFirmware = true;
+  # Universal media can carry both bundles; early boot applies only the update
+  # matching the CPU. Installed systems use upstream vendor detection.
+  hardware.cpu.intel.updateMicrocode = true;
+  hardware.cpu.amd.updateMicrocode = true;
+  nixpkgs.config.allowUnfree = true;
   services.libinput.enable = true;
 
   # Recent laptops need recent DRM, I2C and HID support. Keep the version pinned

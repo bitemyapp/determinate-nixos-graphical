@@ -13,13 +13,13 @@ use std::{
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Profile {
+pub(crate) enum Profile {
     Default,
     Compatibility,
     Lts,
 }
 impl Profile {
-    fn parse(value: &str) -> Result<Self> {
+    pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "default" => Ok(Self::Default),
             "compatibility" => Ok(Self::Compatibility),
@@ -27,14 +27,14 @@ impl Profile {
             _ => bail!("Unknown live profile: {value}"),
         }
     }
-    fn index(self) -> usize {
+    pub(crate) fn index(self) -> usize {
         match self {
             Self::Default => 0,
             Self::Compatibility => 1,
             Self::Lts => 2,
         }
     }
-    fn kernel(self) -> &'static str {
+    pub(crate) fn kernel(self) -> &'static str {
         if self == Self::Lts { "lts" } else { "latest" }
     }
     fn session(self) -> &'static str {

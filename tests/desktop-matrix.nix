@@ -26,9 +26,17 @@ let
     ];
   };
 in
+assert system.config.networking.networkmanager.enable;
+assert system.config.networking.wireless.enable;
+assert system.config.networking.wireless.dbusControlled;
+assert system.config.hardware.enableRedistributableFirmware;
+assert system.config.nixpkgs.config.allowUnfree;
 {
   derivation = system.config.system.build.toplevel.drvPath;
   defaultSession = system.config.services.displayManager.defaultSession;
   sessions = system.config.services.displayManager.sessionData.sessionNames;
   zone = system.config.time.timeZone;
+  supplicantEnabled = system.config.networking.wireless.enable;
+  redistributableFirmware = system.config.hardware.enableRedistributableFirmware;
+  allowUnfree = system.config.nixpkgs.config.allowUnfree;
 }

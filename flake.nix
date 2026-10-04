@@ -47,6 +47,17 @@
         default = self.packages.${system}.iso;
         iso = installer.config.system.build.isoImage;
         inherit tools calamares;
+        # Exported separately for isolated Wi-Fi regression tests, not shipped
+        # in the public ISO or installed as a live access-point service.
+        wifi-test-tools = pkgs.symlinkJoin {
+          name = "respin-wifi-test-tools";
+          paths = [
+            pkgs.hostapd
+            pkgs.iw
+            pkgs.iproute2
+            pkgs.iputils
+          ];
+        };
       };
       checks.${system} = {
         native-installer = calamares;
@@ -74,6 +85,15 @@
             && pkgs.lib.hasPrefix c.boot.kernelPackages.kernel.version (menuLabel c)
             && c.isoImage.configurationName == null
             && c.services.libinput.enable
+            && c.networking.networkmanager.enable
+            && c.networking.networkmanager.wifi.backend == "wpa_supplicant"
+            && c.networking.wireless.enable
+            && c.networking.wireless.dbusControlled
+            && !c.networking.wireless.autoDetectInterfaces
+            && c.hardware.enableRedistributableFirmware
+            && c.hardware.cpu.intel.updateMicrocode
+            && c.hardware.cpu.amd.updateMicrocode
+            && c.nixpkgs.config.allowUnfree
             && !c.boot.plymouth.enable
             && !(c.environment.etc ? "nixos-generate-config.conf")
           ) liveConfigs;
@@ -83,6 +103,12 @@
                 label = menuLabel c;
                 kernel = c.boot.kernelPackages.kernel.version;
                 session = c.services.displayManager.defaultSession;
+                wifiBackend = c.networking.networkmanager.wifi.backend;
+                supplicantEnabled = c.networking.wireless.enable;
+                redistributableFirmware = c.hardware.enableRedistributableFirmware;
+                intelMicrocode = c.hardware.cpu.intel.updateMicrocode;
+                amdMicrocode = c.hardware.cpu.amd.updateMicrocode;
+                allowUnfree = c.nixpkgs.config.allowUnfree;
               }) liveConfigs
             )
           );

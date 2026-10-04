@@ -397,6 +397,7 @@ pub fn build_iso(rebuild: bool) -> Result<()> {
         .current_dir("/workspace")
         .env("TMPDIR", "/build/tmp")
         .args(["flake", "check", "--no-update-lock-file", "-L"]))?;
+    export_wifi_tools()?;
     let mut build = Command::new("nix");
     build
         .current_dir("/workspace")
@@ -443,6 +444,56 @@ pub fn build_iso(rebuild: bool) -> Result<()> {
     }
     ensure!(found, "Build output contained no ISO");
     run(&mut Command::new("sync"))?;
+    Ok(())
+}
+
+fn export_wifi_tools() -> Result<()> {
+    let path = output(
+        Command::new("nix")
+            .current_dir("/workspace")
+            .env("TMPDIR", "/build/tmp")
+            .args([
+                "build",
+                ".#wifi-test-tools",
+                "--no-link",
+                "--print-out-paths",
+                "--no-update-lock-file",
+            ]),
+    )?;
+    let path = path.trim();
+    ensure!(
+        path.starts_with("/nix/store/") && !path.contains(char::is_whitespace),
+        "Invalid test tools output"
+    );
+    let closure = output(Command::new("nix-store").args(["--query", "--requisites", path]))?;
+    let dest = Path::new("/workspace/artifacts/wifi-tools");
+    fs::create_dir_all(dest)?;
+    let nar = dest.join("closure.nar");
+    let lock_sha256 = sha256(Path::new("/workspace/flake.lock"))?;
+    if let Ok(bytes) = fs::read(dest.join("manifest.json"))
+        && let Ok(cached) = serde_json::from_slice::<serde_json::Value>(&bytes)
+        && cached["store_path"] == path
+        && cached["lock_sha256"] == lock_sha256
+        && nar.is_file()
+        && cached["sha256"] == sha256(&nar)?
+    {
+        println!("Reusing verified separate Wi-Fi test tools: {path}");
+        return Ok(());
+    }
+    let file = File::create(&nar)?;
+    run(Command::new("nix-store")
+        .arg("--export")
+        .args(closure.lines())
+        .stdout(file.try_clone()?))?;
+    file.sync_all()?;
+    write_json(
+        &dest.join("manifest.json"),
+        &serde_json::json!({
+            "store_path": path, "sha256": sha256(&nar)?,
+            "lock_sha256": lock_sha256,
+        }),
+    )?;
+    println!("Exported separate Wi-Fi test tools: {path}");
     Ok(())
 }
 

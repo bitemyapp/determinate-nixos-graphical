@@ -1,5 +1,8 @@
 # Parsed-plan installer verification
 
+**Current verification:** see [Wi-Fi backend and hardware-friendly defaults](docs/wifi-hardware-defaults.md)
+for the latest image, simulated-radio regressions and enabled firmware/unfree policy.
+
 **Historical image:** the physical ThinkPad boot subsequently exposed a blank
 internal display and unresponsive input, despite the virtual tests below.
 The corrective candidate and stronger live-input tests are recorded in

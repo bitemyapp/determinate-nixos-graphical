@@ -16,7 +16,17 @@ MATE and LXQt and choose the default login session. Plasma is preselected.
 GNOME and Cinnamon cannot be combined in this pinned NixOS version because
 their modules conflict on GSettings; the UI explains and validates this limit.
 You choose the hostname, normal user, password, full name, timezone, one of
-eight locales/keyboards, and whether to allow unfree packages.
+eight locales/keyboards, and whether to allow unfree packages (enabled by default).
+
+Both the live image and installed system include redistributable device firmware,
+which can be proprietary. The live image also enables both Intel and AMD CPU
+microcode bundles; installed CPU settings come from upstream hardware detection.
+The installed system permits additional unfree packages
+by default, with an explicit GUI opt-out. Opting out does not remove redistributable
+firmware or make the system strictly free-software-only. Package permission is
+not automatic driver selection: NVIDIA/hybrid graphics and unusual out-of-tree
+drivers still need hardware-specific configuration. The installer preserves
+upstream hardware detection and does not force unrelated vendor drivers on all PCs.
 
 This experimental first release does **not** support manual partitioning,
 preserving another OS, encryption, RAID/LVM, Btrfs, offline installation,
@@ -51,8 +61,9 @@ narrow displays:
 
 The native installer carries the selected **kernel** into the target configuration.
 The recovery live desktop does **not** restrict the desktop choices in the installer
-or force software rendering on the installed OS. These are boot-profile changes,
-not a claim that the reported ThinkPad graphics/input failure is proven fixed.
+or force software rendering on the installed OS. The user confirmed the latest
+Plasma entry resolved the reported ThinkPad display/input symptoms; the subsequent
+Wi-Fi backend fix still needs a physical radio retest.
 
 Boot progress is visible rather than hidden by a splash screen. If the GUI fails
 but `Ctrl+Alt+F3` works, run this in the live console:
@@ -126,7 +137,9 @@ forced rebuild, full media read-back and direct read-only UEFI/BIOS boots.
 The replacement [hardware-reliability candidate](docs/hardware-reliability.md)
 documents the later physical failure, short menu labels and recovery profile,
 plus its verified Samsung write/read-back and direct UEFI/BIOS USB boots.
-Physical laptop display/input compatibility still requires a retest.
+The current [Wi-Fi and hardware-defaults report](docs/wifi-hardware-defaults.md)
+records the user's successful display/input retest, the missing supplicant fix,
+firmware/unfree policy and final-image radio regression tests.
 
 Requirements: Linux x86_64, QEMU/KVM access, `bsdtar`, OpenSSH, Rust/Cargo,
 rust-script, about 16 GiB available RAM and at least 40 GiB free disk space.
@@ -153,6 +166,7 @@ hash; that changes the build environment, not the pinned output inputs.
 ```sh
 rust-script --force scripts/test_live.rs artifacts/native-rust/NAME.iso --firmware uefi --profile default --input usb
 rust-script --force scripts/test_live.rs artifacts/native-rust/NAME.iso --firmware bios --profile compatibility --input ps2
+rust-script --force scripts/test_wifi.rs artifacts/native-rust/NAME.iso --profile default
 rust-script --force scripts/qemu_test.rs artifacts/native-rust/NAME.iso --firmware uefi --install
 rust-script --force scripts/qemu_test.rs artifacts/native-rust/NAME.iso --firmware bios --install
 ```
@@ -169,6 +183,18 @@ are tested separately; a successful QMP input command is not considered proof of
 delivery. It also saves menu/desktop screenshots and a live diagnostic report.
 Available profiles are `default`, `compatibility`, and `lts`. These virtual input
 devices do not emulate a particular laptop's I2C touchpad or Intel display engine.
+
+`test_wifi.rs` also attaches no target disk or host radio. It imports the separate
+`artifacts/wifi-tools/closure.nar` exported by the rootless builder after checking
+its hash and system-lock fingerprint. Inside a guarded, temporary QEMU guest it
+uses two `mac80211_hwsim` radios, a WPA2 access point in a separate network
+namespace, and the ISO's actual NetworkManager/wpa_supplicant backend. Passing
+requires SSID discovery, authentication, Wi-Fi-bound packet delivery, disconnect
+and reconnect, plus clean guest shutdown. `--profile` accepts the same three
+profiles as the live-input test. Public synthetic credentials are used; no
+physical SSIDs or saved host credentials are read. The test tools/AP are not
+included in the public ISO. This complements, but cannot replace, a physical
+radio/firmware test.
 
 Installation tests create a fresh 40 GiB regular-file virtual disk, invoke the
 real packaged helper and boot the installed disk without the ISO. The fixed
@@ -197,10 +223,11 @@ the fixed 1280×800 virtual display; it only accepts this repository's disposabl
 40 GiB test-image runs. No fixture installation request is submitted in GUI mode.
 Use these exact test values: `/dev/vda`, hostname `rust-test`, username `rusttest`,
 full name `Rust ${literal} Test`, password `Qemu-Only-Test-123!`, timezone
-`America/Chicago`, locale `en_US.UTF-8`, keyboard `us`, and unfree disabled.
+`America/Chicago`, locale `en_US.UTF-8`, keyboard `us`, and unfree enabled.
 Keep Wi-Fi transfer enabled; use the Location tab's detection button to pick up
-the fixture's live Central zone and confirm it. The latest supervised test
-selects Xfce alone; backend mode installs Plasma and Xfce together.
+the fixture's live Central zone and confirm it. The current supervised test
+keeps Plasma selected; backend mode installs Plasma and Xfce together. Earlier
+Xfce-only GUI runs remain documented as historical evidence.
 Review the disk and type `ERASE /dev/vda` only inside that disposable VM.
 
 A completed backend install can be boot-tested again with

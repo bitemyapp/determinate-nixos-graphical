@@ -1,5 +1,11 @@
 # Live graphics/input reliability candidate
 
+**Historical image:** the user subsequently confirmed that the 7.2.8 Plasma
+entry resolved the reported display/input symptoms, but found no Wi-Fi SSIDs.
+The current correction, firmware/unfree policy and new verification are in
+[Wi-Fi backend and hardware-friendly defaults](wifi-hardware-defaults.md).
+The results below remain evidence for the preceding image only.
+
 2026-10-03, America/Chicago. Branch: `codex/live-hardware-reliability`.
 
 ## Reported failure and evidence
@@ -57,7 +63,7 @@ and [ISO menu generator](https://github.com/NixOS/nixpkgs/blob/c59305bab2065cfec
 
 Final candidate:
 
-- Image: `artifacts/native-rust/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`.
+- Retained image: `artifacts/native-rust-before-wifi/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`.
 - Size: **3,927,244,800 bytes**.
 - SHA-256: `a06e860511db656850c7dcc4b91b348dcaebdfa2f321a7105ec7bd3df59e1978`.
 - Nix output: `/nix/store/3ncxgiaalbqyhhjz8650fzhni8qkvw9p-nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`.
