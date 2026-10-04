@@ -122,9 +122,49 @@ winter CST/summer CDT, and clean shutdown. This was a helper-driven installation
 not another full GUI form/login test. It used only a fresh 40 GiB regular-file
 disk with the guarded `RESPIN_TEST_ONLY` serial. All test VMs have stopped.
 
-Physical laptop compatibility remains **unverified** until the user boots this candidate. The
-Samsung drive has not been overwritten during this repair; these results refer
-to the ISO file, not a refreshed physical USB.
+### Samsung USB deployment
+
+The final candidate above has now replaced the preceding image on the Samsung
+Flash Drive, serial ending **3525**, capacity **32,080,200,192 bytes**. The
+deployment helper checked the complete by-id identity, vendor/model/serial,
+capacity, removable USB transport, mount state and holders before exclusively
+opening the drive. The internal NVMe was not a target.
+
+All **3,927,244,800 image bytes** were written. The final 1 MiB of the device was
+cleared of stale backup partition metadata; this is not a secure erase of unused
+space. After synchronizing writes and invalidating the block cache, every image
+byte was read back and compared with the source. The [read-back evidence](test-results/hardware-usb-readback.json)
+records a matching SHA-256 of
+`a06e860511db656850c7dcc4b91b348dcaebdfa2f321a7105ec7bd3df59e1978`.
+Kernel partition-table refresh succeeded. The media has the expected ISO9660
+`nixos-determinate-x86_64` and FAT `EFIBOOT` partitions.
+
+Both following tests booted the **physical Samsung device**, not the ISO file:
+
+| Firmware | Result | Inspected screenshot |
+| --- | --- | --- |
+| OVMF UEFI | [PASS](test-results/hardware-usb-uefi.json) | [Plasma and Rust installer](images/hardware-usb-uefi.png) |
+| SeaBIOS | [PASS](test-results/hardware-usb-bios.json) | [Plasma and Rust installer](images/hardware-usb-bios.png) |
+
+A single authorization covered writing, read-back and both boots. Before starting
+QEMU, the helper permanently dropped root and supplementary groups and enabled
+`no_new_privs`. QEMU ran as UID 1000 with only a read-only media descriptor, no
+host system disk and no installation target disk. No persistent permission rules
+were changed. QMP independently confirmed the full USB capacity and read-only
+status in both runs.
+
+Both guests reached a live tmpfs root with ISO9660 media, active display manager,
+Plasma and Rust installer processes, and the Determinate daemon socket. They
+reported Determinate Nix 3.23.0 / Nix 2.35.2, with `kernel: latest` and
+`test_diagnostics: false` in the media settings. Both powered off cleanly. These
+are default-profile boot checks; the six-profile/input matrix above separately
+tested the byte-identical ISO file. Raw deployment evidence remains locally in
+`.work/usb-hw-final/`.
+
+The Samsung was left unmounted and all test VMs stopped. The host was not rebooted.
+Physical laptop compatibility remains **unverified** until the user boots this
+candidate. Select **7.2.8 Plasma (default)** first; **7.2.8 Xfce/X11 (software)**
+is the recovery option if the normal session still has problems.
 
 For a failed GUI with a working `Ctrl+Alt+F3` console:
 

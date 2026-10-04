@@ -124,7 +124,9 @@ cache. A successful comparison checks byte-for-byte reproducibility.
 The preceding [physical USB verification](docs/usb-verification.md) records a
 forced rebuild, full media read-back and direct read-only UEFI/BIOS boots.
 The replacement [hardware-reliability candidate](docs/hardware-reliability.md)
-documents the later physical failure, short menu labels and recovery profile.
+documents the later physical failure, short menu labels and recovery profile,
+plus its verified Samsung write/read-back and direct UEFI/BIOS USB boots.
+Physical laptop display/input compatibility still requires a retest.
 
 Requirements: Linux x86_64, QEMU/KVM access, `bsdtar`, OpenSSH, Rust/Cargo,
 rust-script, about 16 GiB available RAM and at least 40 GiB free disk space.
