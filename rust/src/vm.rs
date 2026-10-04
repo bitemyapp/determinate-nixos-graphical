@@ -130,6 +130,14 @@ fn filesystem(value: &str, allow_blank: bool) -> Result<String> {
     );
     Ok(value.into())
 }
+fn acceleration() -> Result<String> {
+    let value = std::env::var("RESPIN_QEMU_ACCEL").unwrap_or_else(|_| "kvm".into());
+    ensure!(
+        ["kvm", "tcg"].contains(&value.as_str()),
+        "RESPIN_QEMU_ACCEL must be kvm or tcg"
+    );
+    Ok(value)
+}
 impl Vm {
     pub fn start(
         work: &Path,
@@ -167,6 +175,15 @@ impl Vm {
                 "Socket already exists; check for a running VM: {socket}"
             );
         }
+        let accelerator = acceleration()?;
+        let machine = format!(
+            "q35,accel={accelerator},vmport=off,i8042={}",
+            if input == InputDevices::Usb {
+                "off"
+            } else {
+                "on"
+            }
+        );
         let mut command = Command::new("qemu-system-x86_64");
         command
             .args([
@@ -177,13 +194,9 @@ impl Vm {
                 "-machine",
                 // Isolate each input path: USB runs have no emulated PS/2
                 // controller; PS/2 runs have no VMware absolute-pointer shim.
-                if input == InputDevices::Usb {
-                    "q35,accel=kvm,vmport=off,i8042=off"
-                } else {
-                    "q35,accel=kvm,vmport=off,i8042=on"
-                },
+                &machine,
                 "-cpu",
-                "host",
+                if accelerator == "tcg" { "max" } else { "host" },
                 "-smp",
                 "4",
                 "-m",
@@ -288,7 +301,8 @@ impl Vm {
         })
     }
     pub fn wait_agent(&mut self) -> Result<()> {
-        let deadline = Instant::now() + Duration::from_secs(240);
+        let deadline =
+            Instant::now() + Duration::from_secs(if acceleration()? == "tcg" { 900 } else { 240 });
         let mut last = String::new();
         while Instant::now() < deadline {
             ensure!(
@@ -552,7 +566,7 @@ pub fn main(args: Vec<String>) -> Result<()> {
     }
     let fixture = if install { Some(fixture(&repo)?) } else { None };
     let pin: Value = serde_json::from_slice(&fs::read(repo.join("nix/calamares-source.json"))?)?;
-    let mut result = json!({"firmware":firmware,"media":"usb-storage","iso":iso.file_name().unwrap().to_string_lossy(),"iso_sha256":digest,"install":install,"gui":gui,"passed":false,"implementation":"native-rust","installer_revision":pin["rev"],"disk_bus":disk_bus.name(),"filesystem":root_filesystem,"previous_filesystem":previous_filesystem});
+    let mut result = json!({"firmware":firmware,"media":"usb-storage","iso":iso.file_name().unwrap().to_string_lossy(),"iso_sha256":digest,"install":install,"gui":gui,"passed":false,"implementation":"native-rust","installer_revision":pin["rev"],"disk_bus":disk_bus.name(),"filesystem":root_filesystem,"previous_filesystem":previous_filesystem,"qemu_acceleration":acceleration()?});
     let mut vm = Vm::start_with_devices(
         &work,
         &firmware,

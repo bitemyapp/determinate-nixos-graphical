@@ -80,6 +80,11 @@ UEFI NVMe, UEFI 4Kn NVMe and BIOS VirtIO, plus blank VirtIO/ext4. It stops on th
 first failure and preserves the normal per-run JSON, logs and screenshots.
 GUI tests use a blank disk and verify the filesystem selected in the runner.
 
+For hosts without KVM, set `RESPIN_QEMU_ACCEL=tcg`. This uses QEMU's emulated
+CPU and allows up to 15 minutes for the guest agent to start; the installation
+assertions are unchanged. Set `OVMF_CODE` and `OVMF_VARS` to the firmware files
+provided by the host's QEMU package. The result records the chosen accelerator.
+
 ## Validation on 2026-10-04
 
 Completed in a disposable Linux container on the macOS development host
