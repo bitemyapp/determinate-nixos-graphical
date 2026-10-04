@@ -549,17 +549,27 @@ fn check_configurations(kind: &str, expected: usize, jobs: usize) -> Result<()> 
     }
     let cache = repo.join(format!("artifacts/native-rust/{kind}-matrix.json"));
     let expression = format!("tests/{kind}-matrix.nix");
-    let fingerprint = format!(
-        "{}:{}:{}",
-        sha256(&path)?,
-        sha256(&repo.join("flake.lock"))?,
-        sha256(&repo.join(&expression))?
-    );
+    // The generated configuration imports the pinned installer module. Its
+    // semantics can change even when the generated selection text does not.
+    let fingerprint = [
+        path,
+        repo.join("flake.lock"),
+        repo.join(&expression),
+        repo.join("flake.nix"),
+        repo.join("nix/calamares.nix"),
+        repo.join("nix/calamares-source.json"),
+        repo.join("nix/applications.nix"),
+    ]
+    .iter()
+    .map(|path| sha256(path))
+    .collect::<Result<Vec<_>>>()?
+    .join(":");
     if fs::read(&cache)
         .ok()
         .and_then(|v| serde_json::from_slice::<serde_json::Value>(&v).ok())
         .is_some_and(|v| {
             v["fingerprint"] == fingerprint
+                && v["installer_revision"] == rev
                 && v["cases"]
                     .as_object()
                     .is_some_and(|c| c.len() == cases.len())

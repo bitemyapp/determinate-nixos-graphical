@@ -77,7 +77,7 @@ cd "$work"
 # Exercise rootless networking, execution and the Compose plugin as the user.
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
-export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/docker.sock"
+test "${DOCKER_HOST:-}" = "unix://$XDG_RUNTIME_DIR/docker.sock"
 systemctl --user is-active docker
 if id -nG | tr ' ' '\n' | grep -qx docker; then
     echo 'Unexpected privileged docker group membership' >&2
