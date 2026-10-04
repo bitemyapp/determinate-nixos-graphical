@@ -72,6 +72,13 @@ No installer configuration, live user, autologin or live permission rules are
 imported into the installed system. Password hashes stay in a root-only runtime
 file outside the flake source, never in the Nix store.
 
+The installer parses raw form/JSON input into an immutable reviewed plan. Only
+an explicitly confirmed plan can reach the executor; the privileged helper
+parses again at the IPC boundary. Desktop/default-session rules and normalized
+Wi-Fi profiles stay in the parsed values. Disk and mount state are still
+checked at the point of use. See the fork's
+[architecture notes](https://github.com/bitemyapp/calamares/blob/codex/nixos-rust/RUST-INSTALLER.md#parse-once-per-process-boundary).
+
 ## Build
 
 With Nix on an x86_64 Linux host:
