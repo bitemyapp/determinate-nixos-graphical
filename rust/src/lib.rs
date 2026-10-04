@@ -1,6 +1,7 @@
 pub mod builder;
 pub mod config;
 pub mod gui_input;
+pub mod live_test;
 pub mod support;
 pub mod vm;
 
@@ -9,6 +10,9 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
         let usage = match command {
             "build-rootless" => "BOOTSTRAP_ISO [--sha256 HEX] [--rebuild-iso]",
             "qemu-test" => "ISO [--firmware bios|uefi] [--install] [--gui]",
+            "live-test" => {
+                "ISO [--firmware bios|uefi] [--profile default|compatibility|lts] [--input usb|ps2]"
+            }
             "qmp-input" => "RUN-NAME screenshot|key|type|click [VALUES]",
             "boot-installed" => "RUN-NAME",
             "check-config" => "template|settings FILE FILE",
@@ -29,6 +33,7 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
             builder::build_iso(!args.is_empty())
         }
         "qemu-test" => vm::main(args),
+        "live-test" => live_test::main(args),
         "qmp-input" => gui_input::main(args),
         "boot-installed" => vm::boot_installed(args),
         "check-config" => config::main(args),

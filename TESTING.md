@@ -1,5 +1,11 @@
 # Parsed-plan installer verification
 
+**Historical image:** the physical ThinkPad boot subsequently exposed a blank
+internal display and unresponsive input, despite the virtual tests below.
+The corrective candidate and stronger live-input tests are recorded in
+[docs/hardware-reliability.md](docs/hardware-reliability.md). This report is
+retained as evidence for the older image, not proof of physical compatibility.
+
 This report concerns `codex/rust-calamares-integration` and the "parse, don't
 validate" refactor. The preceding report is preserved in
 [docs/testing-b746056.md](docs/testing-b746056.md) with its original evidence.
@@ -12,7 +18,7 @@ recorded separately in [docs/usb-verification.md](docs/usb-verification.md).
 - Rust installer: `d2fd201d94327a4aae0d91bb40de1963509f0573`.
 - Source hash: `sha256-2X6MjHHNFXnHt4NoVU6CvqdXPvlcOchyc/Pk9bQeoxA=`.
 - Unchanged lock SHA-256: `2a1e300d41e32889d2f108a9405294cf89f0a196d755bfc4bf43b8eea9852d69`.
-- ISO: `artifacts/native-rust/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`.
+- Retained historical ISO: `artifacts/native-rust-before-hardware-fix/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`.
 - Size: **3,813,998,592 bytes**.
 - SHA-256: `f8c38600d0fc27de6cbfdddac191519f991a912c1f3285c2b4968d9057c41d5c`.
 - Native package: `/nix/store/fj3sxzinw8q5kriw4rfq87gs32j9agfj-calamares-nixos-rust-0.1.0`.

@@ -2,6 +2,11 @@
 
 2026-10-04 UTC (2026-10-03 in America/Chicago).
 
+**Historical deployment:** these exact bytes later failed the user's physical
+ThinkPad live-session test. The checksum/read-back and QEMU results remain valid,
+but did not prove that laptop's display/input compatibility. See the
+[corrective candidate report](hardware-reliability.md).
+
 ## Disk cleanup
 
 Removed only individually inspected, obsolete generated artifacts: 24 disposable
@@ -36,7 +41,7 @@ warnings denied also passed.
 - Installer revision: `d2fd201d94327a4aae0d91bb40de1963509f0573`.
 - Nixpkgs revision: `c59305bab2065cfecc4944690d9eedbb56f3a9fa`.
 - Unchanged lock SHA-256: `2a1e300d41e32889d2f108a9405294cf89f0a196d755bfc4bf43b8eea9852d69`.
-- Image: `artifacts/native-rust/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`.
+- Retained historical image: `artifacts/native-rust-before-hardware-fix/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`.
 - Size: **3,813,998,592 bytes**.
 - SHA-256: **`f8c38600d0fc27de6cbfdddac191519f991a912c1f3285c2b4968d9057c41d5c`**.
 
@@ -44,7 +49,7 @@ Nix's rebuild comparison succeeded. The host independently checked the exported
 sidecar and compared the fresh image with the preceding image byte-for-byte
 before removing that redundant copy. This checksum identifies our custom build;
 it is not a vendor signature. The fresh build log is retained locally at
-`artifacts/native-rust/build.log`.
+`artifacts/native-rust-before-hardware-fix/build.log`.
 
 ## Physical write and read-back
 

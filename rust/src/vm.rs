@@ -55,6 +55,10 @@ impl Rpc {
         self.send("guest-shutdown", json!({"mode":"powerdown"}))?;
         Ok(())
     }
+    pub fn screenshot(&mut self, dest: &Path) -> Result<()> {
+        self.call("screendump", json!({"filename":dest,"format":"png"}))?;
+        Ok(())
+    }
     pub fn call(&mut self, command: &str, arguments: Value) -> Result<Value> {
         let id = self.send(command, arguments)?;
         let deadline = Instant::now() + Duration::from_secs(30);
@@ -82,6 +86,11 @@ pub struct Vm {
     process: Option<Process>,
     agent: Option<Rpc>,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InputDevices {
+    Ps2,
+    Usb,
+}
 impl Vm {
     pub fn start(
         work: &Path,
@@ -89,6 +98,16 @@ impl Vm {
         iso: Option<&Path>,
         disk: Option<&Path>,
         share: Option<&Path>,
+    ) -> Result<Self> {
+        Self::start_with_input(work, firmware, iso, disk, share, InputDevices::Usb)
+    }
+    pub fn start_with_input(
+        work: &Path,
+        firmware: &str,
+        iso: Option<&Path>,
+        disk: Option<&Path>,
+        share: Option<&Path>,
+        input: InputDevices,
     ) -> Result<Self> {
         ensure!(["bios", "uefi"].contains(&firmware), "Unknown firmware");
         fs::create_dir_all(work)?;
@@ -104,7 +123,13 @@ impl Vm {
                 "-name",
                 "determinate-respin-test",
                 "-machine",
-                "q35,accel=kvm",
+                // Isolate each input path: USB runs have no emulated PS/2
+                // controller; PS/2 runs have no VMware absolute-pointer shim.
+                if input == InputDevices::Usb {
+                    "q35,accel=kvm,vmport=off,i8042=off"
+                } else {
+                    "q35,accel=kvm,vmport=off,i8042=on"
+                },
                 "-cpu",
                 "host",
                 "-smp",
@@ -159,10 +184,21 @@ impl Vm {
                 .arg("-drive")
                 .arg(format!("if=pflash,format=raw,file={}", qpath(&vars)?));
         }
+        if iso.is_some() || input == InputDevices::Usb {
+            command.args(["-device", "qemu-xhci,id=xhci"]);
+        }
+        if input == InputDevices::Usb {
+            command.args([
+                "-device",
+                "usb-kbd,bus=xhci.0",
+                "-device",
+                "usb-tablet,bus=xhci.0",
+            ]);
+        }
         if let Some(iso) = iso {
             regular(iso)?;
             command
-                .args(["-device", "qemu-xhci,id=xhci", "-drive"])
+                .arg("-drive")
                 .arg(format!(
                     "if=none,id=iso,format=raw,readonly=on,file={}",
                     qpath(iso)?
@@ -260,11 +296,9 @@ impl Vm {
         bail!("Guest command timed out: {command}")
     }
     pub fn screenshot(&self, dest: &Path) -> Result<()> {
-        Rpc::connect(&self.work.join("qmp.sock"), true, 20)?
-            .call("screendump", json!({"filename":dest,"format":"png"}))?;
-        Ok(())
+        Rpc::connect(&self.work.join("qmp.sock"), true, 20)?.screenshot(dest)
     }
-    fn poweroff(&mut self) -> Result<()> {
+    pub fn poweroff(&mut self) -> Result<()> {
         self.agent
             .as_mut()
             .context("No guest agent")?
@@ -464,6 +498,8 @@ pub fn main(args: Vec<String>) -> Result<()> {
         );
         println!("{live}");
         result["live"] = json!(live);
+        let live_kernel = vm.execute("uname -r", SHORT)?.trim().to_owned();
+        result["live_kernel"] = json!(live_kernel);
         result["media_config_permissions"] = json!(vm.execute(
             "stat -c '%u:%g %a %n' /nix/store; stat -Lc '%u:%g %a %n' /etc/calamares-nixos/settings.json",
             SHORT,
@@ -521,6 +557,12 @@ pub fn main(args: Vec<String>) -> Result<()> {
             vm = Vm::start(&work, &firmware, None, Some(&disk), Some(&repo))?;
             println!("Booting the installed disk with no ISO attached");
             let installed = verify_installed(&mut vm, &artifacts, &repo, fixture, gui)?;
+            let installed_kernel = vm.execute("uname -r", SHORT)?.trim().to_owned();
+            ensure!(
+                installed_kernel == live_kernel,
+                "Installed kernel {installed_kernel} differs from selected live kernel {live_kernel}"
+            );
+            result["installed_kernel"] = json!(installed_kernel);
             println!("{installed}");
             result["installed"] = json!(installed);
             result["graphical_login"] = json!(gui);

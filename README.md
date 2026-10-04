@@ -10,7 +10,7 @@ Calamares engine. It is not endorsed by NixOS, Calamares or Determinate Systems.
 ## Supported workflow
 
 The native installer supports guided **whole-disk erase**, GPT/ext4, UEFI with
-systemd-boot or legacy BIOS with GRUB. The live desktop stays Plasma, while the
+systemd-boot or legacy BIOS with GRUB. The default live desktop is Plasma, while the
 installer lets you select **one or more** of Plasma, GNOME, Xfce, Cinnamon,
 MATE and LXQt and choose the default login session. Plasma is preselected.
 GNOME and Cinnamon cannot be combined in this pinned NixOS version because
@@ -41,8 +41,29 @@ Failures do not default to US Eastern, and late responses cannot overwrite
 manual edits. US Central uses `America/Chicago`, including daylight saving.
 
 Both the live and installed systems use Determinate Nix, Determinate Nixd and
-`fh`. The boot menu offers an LTS kernel and a latest-kernel specialisation;
-the native installer carries that choice into its target configuration.
+`fh`. The boot menu puts the kernel and session first so they remain visible on
+narrow displays:
+
+- `7.2.8 Plasma (default)`: the latest kernel in the existing pinned Nixpkgs.
+- `7.2.8 Xfce/X11 (software)`: a recovery live desktop with software rendering
+  and no Xfce compositor; avoids the Plasma/KWin Wayland session.
+- `6.18.54 Plasma (LTS)`: the older-kernel fallback.
+
+The native installer carries the selected **kernel** into the target configuration.
+The recovery live desktop does **not** restrict the desktop choices in the installer
+or force software rendering on the installed OS. These are boot-profile changes,
+not a claim that the reported ThinkPad graphics/input failure is proven fixed.
+
+Boot progress is visible rather than hidden by a splash screen. If the GUI fails
+but `Ctrl+Alt+F3` works, run this in the live console:
+
+```sh
+sudo installer-live-diagnostics > /tmp/installer-hardware-report.txt
+```
+
+Save the report before rebooting; `/tmp` is volatile. It includes hardware
+identifiers and kernel/display-manager logs, so review before sharing. It neither
+uploads anything nor reads saved Wi-Fi profiles or raw keyboard events.
 
 ## Locked sources and clean integration
 
@@ -100,8 +121,10 @@ rust-script --force scripts/build_rootless.rs /path/to/nixos-with-determinate.is
 Add `--rebuild-iso` to force Nix to rebuild and compare the ISO output instead
 of only reusing an existing image. Dependencies can still use the verified
 cache. A successful comparison checks byte-for-byte reproducibility.
-The latest [physical USB verification](docs/usb-verification.md) records a
+The preceding [physical USB verification](docs/usb-verification.md) records a
 forced rebuild, full media read-back and direct read-only UEFI/BIOS boots.
+The replacement [hardware-reliability candidate](docs/hardware-reliability.md)
+documents the later physical failure, short menu labels and recovery profile.
 
 Requirements: Linux x86_64, QEMU/KVM access, `bsdtar`, OpenSSH, Rust/Cargo,
 rust-script, about 16 GiB available RAM and at least 40 GiB free disk space.
@@ -126,6 +149,8 @@ hash; that changes the build environment, not the pinned output inputs.
 ## QEMU verification
 
 ```sh
+rust-script --force scripts/test_live.rs artifacts/native-rust/NAME.iso --firmware uefi --profile default --input usb
+rust-script --force scripts/test_live.rs artifacts/native-rust/NAME.iso --firmware bios --profile compatibility --input ps2
 rust-script --force scripts/qemu_test.rs artifacts/native-rust/NAME.iso --firmware uefi --install
 rust-script --force scripts/qemu_test.rs artifacts/native-rust/NAME.iso --firmware bios --install
 ```
@@ -134,6 +159,14 @@ Tests boot the complete ISO as read-only **USB mass storage**, through real
 firmware, not direct kernel boot. UEFI needs OVMF; set `OVMF_CODE` and
 `OVMF_VARS` if your matching firmware files differ from the Arch/CachyOS defaults.
 Secure Boot is not enabled.
+
+`test_live.rs` attaches **no target disk**. It selects the requested menu entry,
+checks the kernel policy and active seat/session, then requires an actual guest
+window to receive a mouse click and the exact typed marker. USB and PS/2 devices
+are tested separately; a successful QMP input command is not considered proof of
+delivery. It also saves menu/desktop screenshots and a live diagnostic report.
+Available profiles are `default`, `compatibility`, and `lts`. These virtual input
+devices do not emulate a particular laptop's I2C touchpad or Intel display engine.
 
 Installation tests create a fresh 40 GiB regular-file virtual disk, invoke the
 real packaged helper and boot the installed disk without the ISO. The fixed
