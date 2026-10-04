@@ -91,6 +91,45 @@ pub enum InputDevices {
     Ps2,
     Usb,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiskBus {
+    Virtio,
+    Nvme,
+    Nvme4k,
+}
+impl DiskBus {
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "virtio" => Ok(Self::Virtio),
+            "nvme" => Ok(Self::Nvme),
+            "nvme4k" => Ok(Self::Nvme4k),
+            _ => bail!("Disk bus must be virtio, nvme or nvme4k"),
+        }
+    }
+    fn name(self) -> &'static str {
+        match self {
+            Self::Virtio => "virtio",
+            Self::Nvme => "nvme",
+            Self::Nvme4k => "nvme4k",
+        }
+    }
+    fn device(self) -> &'static str {
+        match self {
+            Self::Virtio => "virtio-blk-pci,drive=target,serial=RESPIN_TEST_ONLY,bootindex=2",
+            Self::Nvme => "nvme,drive=target,serial=RESPIN_TEST_ONLY,bootindex=2",
+            Self::Nvme4k => {
+                "nvme,drive=target,serial=RESPIN_TEST_ONLY,bootindex=2,logical_block_size=4096,physical_block_size=4096"
+            }
+        }
+    }
+}
+fn filesystem(value: &str, allow_blank: bool) -> Result<String> {
+    ensure!(
+        ["ext4", "btrfs", "xfs"].contains(&value) || (allow_blank && value == "blank"),
+        "Unsupported test filesystem: {value}"
+    );
+    Ok(value.into())
+}
 impl Vm {
     pub fn start(
         work: &Path,
@@ -108,6 +147,17 @@ impl Vm {
         disk: Option<&Path>,
         share: Option<&Path>,
         input: InputDevices,
+    ) -> Result<Self> {
+        Self::start_with_devices(work, firmware, iso, disk, share, input, DiskBus::Virtio)
+    }
+    pub fn start_with_devices(
+        work: &Path,
+        firmware: &str,
+        iso: Option<&Path>,
+        disk: Option<&Path>,
+        share: Option<&Path>,
+        input: InputDevices,
+        disk_bus: DiskBus,
     ) -> Result<Self> {
         ensure!(["bios", "uefi"].contains(&firmware), "Unknown firmware");
         fs::create_dir_all(work)?;
@@ -215,10 +265,7 @@ impl Vm {
                     "if=none,id=target,format=raw,file={}",
                     qpath(disk)?
                 ))
-                .args([
-                    "-device",
-                    "virtio-blk-pci,drive=target,serial=RESPIN_TEST_ONLY,bootindex=2",
-                ]);
+                .args(["-device", disk_bus.device()]);
         }
         if let Some(repo) = share {
             command.arg("-virtfs").arg(format!(
@@ -373,6 +420,7 @@ fn verify_installed(
     repo: &Path,
     fixture: &str,
     graphical_login: bool,
+    filesystem: &str,
 ) -> Result<String> {
     vm.wait_agent()?;
     vm.execute("for i in $(seq 1 90); do systemctl is-active --quiet display-manager && exit 0; sleep 1; done; exit 1", SHORT)?;
@@ -381,7 +429,11 @@ fn verify_installed(
         SHORT,
     )?;
     let output = vm.execute(
-        &format!("{} verify", shell_quote(fixture)),
+        &format!(
+            "CALAMARES_TEST_FILESYSTEM={} {} verify",
+            shell_quote(filesystem),
+            shell_quote(fixture)
+        ),
         Duration::from_secs(180),
     )?;
     ensure!(
@@ -443,12 +495,25 @@ pub fn main(args: Vec<String>) -> Result<()> {
     let mut iso = None;
     let mut firmware = "uefi".to_string();
     let mut install = false;
+    let mut disk_bus = DiskBus::Nvme;
+    let mut root_filesystem = "ext4".to_string();
+    let mut previous_filesystem = None;
     let mut gui = false;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--firmware" => firmware = args.next().context("Missing firmware")?,
             "--install" => install = true,
+            "--disk-bus" => disk_bus = DiskBus::parse(&args.next().context("Missing disk bus")?)?,
+            "--filesystem" => {
+                root_filesystem = filesystem(&args.next().context("Missing filesystem")?, false)?
+            }
+            "--previous-filesystem" => {
+                previous_filesystem = Some(filesystem(
+                    &args.next().context("Missing previous filesystem")?,
+                    true,
+                )?)
+            }
             "--gui" => {
                 gui = true;
                 install = true;
@@ -461,10 +526,20 @@ pub fn main(args: Vec<String>) -> Result<()> {
         ["bios", "uefi"].contains(&firmware.as_str()),
         "Firmware must be bios or uefi"
     );
-    let iso = regular(&iso.context("Usage: qemu_test.rs ISO [--firmware bios|uefi] [--install]")?)?;
+    let previous_filesystem =
+        previous_filesystem.unwrap_or_else(|| if gui { "blank" } else { "btrfs" }.into());
+    ensure!(
+        !gui || previous_filesystem == "blank",
+        "GUI tests require --previous-filesystem blank; backend tests seed prior filesystems"
+    );
+    let iso = regular(&iso.context("Usage: qemu_test.rs ISO [--firmware bios|uefi] [--install] [--disk-bus virtio|nvme|nvme4k] [--filesystem ext4|btrfs|xfs] [--previous-filesystem blank|ext4|btrfs|xfs]")?)?;
     let digest = sha256(&iso)?;
     let repo = repo()?;
-    let name = format!("{firmware}-{}", stamp());
+    let name = format!(
+        "{firmware}-{}-{root_filesystem}-{}",
+        disk_bus.name(),
+        stamp()
+    );
     let work = repo.join(".work").join(&name);
     let artifacts = repo.join("artifacts").join(&name);
     fs::create_dir_all(repo.join(".work"))?;
@@ -477,13 +552,15 @@ pub fn main(args: Vec<String>) -> Result<()> {
     }
     let fixture = if install { Some(fixture(&repo)?) } else { None };
     let pin: Value = serde_json::from_slice(&fs::read(repo.join("nix/calamares-source.json"))?)?;
-    let mut result = json!({"firmware":firmware,"media":"usb-storage","iso":iso.file_name().unwrap().to_string_lossy(),"iso_sha256":digest,"install":install,"gui":gui,"passed":false,"implementation":"native-rust","installer_revision":pin["rev"]});
-    let mut vm = Vm::start(
+    let mut result = json!({"firmware":firmware,"media":"usb-storage","iso":iso.file_name().unwrap().to_string_lossy(),"iso_sha256":digest,"install":install,"gui":gui,"passed":false,"implementation":"native-rust","installer_revision":pin["rev"],"disk_bus":disk_bus.name(),"filesystem":root_filesystem,"previous_filesystem":previous_filesystem});
+    let mut vm = Vm::start_with_devices(
         &work,
         &firmware,
         Some(&iso),
         install.then_some(disk.as_path()),
         install.then_some(repo.as_path()),
+        InputDevices::Usb,
+        disk_bus,
     )?;
     let outcome = (|| -> Result<()> {
         println!("Booting {name} from USB mass storage");
@@ -540,8 +617,8 @@ pub fn main(args: Vec<String>) -> Result<()> {
                 // The fixture is shared from the host, never shipped on the ISO.
                 vm.execute(
                     &format!(
-                        "{} install > {} 2>&1",
-                        shell_quote(fixture),
+                        "CALAMARES_TEST_FILESYSTEM={} CALAMARES_TEST_PREVIOUS_FILESYSTEM={} {} install > {} 2>&1",
+                        shell_quote(&root_filesystem), shell_quote(&previous_filesystem), shell_quote(fixture),
                         shell_quote(&format!("/workspace/artifacts/{name}/install.log"))
                     ),
                     Duration::from_secs(7500),
@@ -556,9 +633,18 @@ pub fn main(args: Vec<String>) -> Result<()> {
             result["backend_completed"] = json!(true);
             vm.poweroff()?;
             fs::copy(work.join("serial.log"), artifacts.join("live-serial.log"))?;
-            vm = Vm::start(&work, &firmware, None, Some(&disk), Some(&repo))?;
+            vm = Vm::start_with_devices(
+                &work,
+                &firmware,
+                None,
+                Some(&disk),
+                Some(&repo),
+                InputDevices::Usb,
+                disk_bus,
+            )?;
             println!("Booting the installed disk with no ISO attached");
-            let installed = verify_installed(&mut vm, &artifacts, &repo, fixture, gui)?;
+            let installed =
+                verify_installed(&mut vm, &artifacts, &repo, fixture, gui, &root_filesystem)?;
             let installed_kernel = vm.execute("uname -r", SHORT)?.trim().to_owned();
             ensure!(
                 installed_kernel == live_kernel,
@@ -606,6 +692,8 @@ pub fn boot_installed(args: Vec<String>) -> Result<()> {
             && result["iso_sha256"].is_string(),
         "Incomplete original evidence"
     );
+    let disk_bus = DiskBus::parse(result["disk_bus"].as_str().unwrap_or("virtio"))?;
+    let root_filesystem = filesystem(result["filesystem"].as_str().unwrap_or("ext4"), false)?;
     let disk = regular(&previous_work.join("target.raw"))?;
     ensure!(
         fs::metadata(&disk)?.len() == 40 * 1024u64.pow(3),
@@ -638,20 +726,46 @@ pub fn boot_installed(args: Vec<String>) -> Result<()> {
     result["disk_only_boot"] = json!(true);
     result["implementation"] = json!("native-rust");
     let fixture = fixture(&repo)?;
-    let mut vm = Vm::start(&work, &firmware, None, Some(&disk), Some(&repo))?;
+    let mut vm = Vm::start_with_devices(
+        &work,
+        &firmware,
+        None,
+        Some(&disk),
+        Some(&repo),
+        InputDevices::Usb,
+        disk_bus,
+    )?;
     println!("Booting installed {firmware} disk; no ISO attached");
     let gui = result["gui"] == true;
-    let outcome = verify_installed(&mut vm, &artifacts, &repo, &fixture, gui).and_then(|text| {
-        println!("{text}");
-        result["installed"] = json!(text);
-        vm.poweroff()
-    });
+    let outcome = verify_installed(&mut vm, &artifacts, &repo, &fixture, gui, &root_filesystem)
+        .and_then(|text| {
+            println!("{text}");
+            result["installed"] = json!(text);
+            vm.poweroff()
+        });
     record(vm, &work, &artifacts, &mut result, outcome)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn storage_options_are_closed_and_nvme_sector_size_is_explicit() {
+        assert!(DiskBus::parse("sata").is_err());
+        assert!(filesystem("ntfs", false).is_err());
+        assert!(filesystem("blank", false).is_err());
+        assert!(filesystem("blank", true).is_ok());
+        assert!(
+            DiskBus::Nvme4k
+                .device()
+                .contains("logical_block_size=4096,physical_block_size=4096")
+        );
+        assert!(DiskBus::Nvme.device().starts_with("nvme,"));
+        for bus in [DiskBus::Virtio, DiskBus::Nvme, DiskBus::Nvme4k] {
+            assert_eq!(DiskBus::parse(bus.name()).unwrap(), bus);
+            assert!(bus.device().contains("serial=RESPIN_TEST_ONLY"));
+        }
+    }
     #[test]
     fn shutdown_uses_process_status_without_rpc_reply() {
         for success in [true, false] {

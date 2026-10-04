@@ -9,8 +9,8 @@ Calamares engine. It is not endorsed by NixOS, Calamares or Determinate Systems.
 
 ## Supported workflow
 
-The native installer supports guided **whole-disk erase**, GPT/ext4, UEFI with
-systemd-boot or legacy BIOS with GRUB. The default live desktop is Plasma, while the
+The native installer supports guided **whole-disk erase**, GPT with ext4
+(default), Btrfs or XFS, UEFI with systemd-boot or legacy BIOS with GRUB. The default live desktop is Plasma, while the
 installer lets you select **one or more** of Plasma, GNOME, Xfce, Cinnamon,
 MATE and LXQt and choose the default login session. Plasma is preselected.
 GNOME and Cinnamon cannot be combined in this pinned NixOS version because
@@ -29,8 +29,10 @@ drivers still need hardware-specific configuration. The installer preserves
 upstream hardware detection and does not force unrelated vendor drivers on all PCs.
 
 This experimental first release does **not** support manual partitioning,
-preserving another OS, encryption, RAID/LVM, Btrfs, offline installation,
+preserving another OS, encryption, RAID/LVM, offline installation,
 translated UI or upstream Calamares plugins.
+Btrfs uses compression on one root volume; automatic snapshots are not configured.
+The EFI boot partition always uses FAT32.
 Network access is required. Back up data before using it on a real disk.
 See [TESTING.md](TESTING.md) for the tested scenarios and their limits.
 
@@ -196,9 +198,29 @@ physical SSIDs or saved host credentials are read. The test tools/AP are not
 included in the public ISO. This complements, but cannot replace, a physical
 radio/firmware test.
 
-Installation tests create a fresh 40 GiB regular-file virtual disk, invoke the
-real packaged helper and boot the installed disk without the ISO. The fixed
-public test credentials are only used in the disposable VM. A statically linked
+Installation tests create a 40 GiB regular-file virtual disk, seed a previous
+filesystem, invoke the real packaged helper and boot the installed disk without
+the ISO. Backend tests default to **NVMe with an existing Btrfs filesystem** and
+an ext4 target. Select `--disk-bus virtio|nvme|nvme4k`,
+`--filesystem ext4|btrfs|xfs`, and
+`--previous-filesystem blank|ext4|btrfs|xfs` explicitly to vary the case.
+`nvme4k` uses 4096-byte logical and physical sectors. Results record these
+choices and reboot with the same controller; verification checks the root type,
+persistent device paths and Btrfs compression after reboot.
+
+Run the ten-case release matrix (nine used-disk installs across NVMe, 4Kn NVMe
+and BIOS/VirtIO, plus the original blank VirtIO case) with:
+
+```sh
+rust-script --force scripts/qemu_storage_matrix.rs artifacts/native-rust/NAME.iso
+```
+
+`nix flake check` also runs a smaller storage VM test against temporary loop
+images: all old/new filesystem pairs, 512-byte/4096-byte sectors, remount data
+integrity and FAT32 mounts. This test can use emulation without nested KVM.
+See [storage reliability](docs/storage-reliability.md) for evidence and limits.
+
+The fixed public test credentials are only used in the disposable VM. A statically linked
 fixture is built from the **same pinned fork revision** and shared into the VM;
 neither this fixture nor the orchestration tools are shipped on the normal ISO.
 
@@ -215,20 +237,23 @@ results are under `artifacts/`. Backend tests do not by themselves verify every
 interactive GUI control; recorded GUI checks are identified in TESTING.md.
 
 For a supervised GUI-to-helper test, add `--gui` (it implies `--install`).
+GUI mode defaults to a blank NVMe disk (use `--disk-bus virtio` for older instructions).
 The test waits up to ten minutes for an operator to fill the actual GUI, then
 checks the installed disk and signs into the chosen Plasma or Xfce session with
 the public test password (other desktops are evaluated, not login-automated).
 Use `tests/qmp_input.rs RUN-NAME screenshot|click|key|type` to inspect and drive
 the fixed 1280×800 virtual display; it only accepts this repository's disposable
 40 GiB test-image runs. No fixture installation request is submitted in GUI mode.
-Use these exact test values: `/dev/vda`, hostname `rust-test`, username `rusttest`,
+Use these exact test values: `/dev/nvme0n1` (or `/dev/vda` for VirtIO), hostname
+`rust-test`, username `rusttest`,
 full name `Rust ${literal} Test`, password `Qemu-Only-Test-123!`, timezone
 `America/Chicago`, locale `en_US.UTF-8`, keyboard `us`, and unfree enabled.
 Keep Wi-Fi transfer enabled; use the Location tab's detection button to pick up
 the fixture's live Central zone and confirm it. The current supervised test
 keeps Plasma selected; backend mode installs Plasma and Xfce together. Earlier
 Xfce-only GUI runs remain documented as historical evidence.
-Review the disk and type `ERASE /dev/vda` only inside that disposable VM.
+Choose the same filesystem as the runner (ext4 by default). Review the disk and
+type `ERASE /dev/nvme0n1` (or `ERASE /dev/vda` for VirtIO) only inside that disposable VM.
 
 A completed backend install can be boot-tested again with
 `rust-script --force scripts/boot_installed.rs RUN-NAME`. This reuses only its

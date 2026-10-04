@@ -1,7 +1,10 @@
 # Parsed-plan installer verification
 
-**Current verification:** see [Wi-Fi backend and hardware-friendly defaults](docs/wifi-hardware-defaults.md)
-for the latest image, simulated-radio regressions and enabled firmware/unfree policy.
+**Current storage work:** the user reported a root mount failure on a ThinkPad
+X1 Carbon Gen 14 NVMe. See [storage reliability](docs/storage-reliability.md)
+for the fix, filesystem choices, tests, and outstanding final-ISO/hardware checks.
+The earlier [Wi-Fi and hardware-defaults report](docs/wifi-hardware-defaults.md)
+records the preceding image; its passes did not cover used NVMe installation.
 
 **Historical image:** the physical ThinkPad boot subsequently exposed a blank
 internal display and unresponsive input, despite the virtual tests below.

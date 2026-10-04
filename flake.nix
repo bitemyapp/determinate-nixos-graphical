@@ -61,6 +61,7 @@
       };
       checks.${system} = {
         native-installer = calamares;
+        storage = calamares.storageTest;
         live-profiles =
           let
             normal = installer.config;
@@ -90,6 +91,10 @@
             && c.networking.wireless.enable
             && c.networking.wireless.dbusControlled
             && !c.networking.wireless.autoDetectInterfaces
+            && c.boot.supportedFilesystems.ext4
+            && c.boot.supportedFilesystems.btrfs
+            && c.boot.supportedFilesystems.xfs
+            && c.boot.supportedFilesystems.vfat
             && c.hardware.enableRedistributableFirmware
             && c.hardware.cpu.intel.updateMicrocode
             && c.hardware.cpu.amd.updateMicrocode

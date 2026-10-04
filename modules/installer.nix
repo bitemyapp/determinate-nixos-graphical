@@ -81,7 +81,13 @@ in
   # Recent laptops need recent DRM, I2C and HID support. Keep the version pinned
   # by our existing lock; the older kernel is an explicitly named fallback.
   boot.kernelPackages = pkgs.linuxPackages_latest;
-  boot.supportedFilesystems.zfs = lib.mkForce false;
+  boot.supportedFilesystems = {
+    ext4 = true;
+    btrfs = true;
+    xfs = true;
+    vfat = true;
+    zfs = lib.mkForce false;
+  };
   # Keep boot progress and the text-console recovery route visible.
   boot.plymouth.enable = lib.mkForce false;
 
