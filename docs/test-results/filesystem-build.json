@@ -40,8 +40,11 @@
     "tests/desktop-matrix.nix",
     "validation documentation"
   ],
-  "release_validation": "Full ISO matrix and USB verification in progress",
+  "release_validation": "All ten full ISO installation/reboot cases and installed graphical login passed; physical USB verification awaits macOS authentication.",
   "flake_check_passed": true,
   "native_runtime_tests": 35,
-  "compile_fail_doctests": 6
+  "compile_fail_doctests": 6,
+  "full_iso_install_boot_cases_passed": 10,
+  "installed_graphical_login_passed": true,
+  "written_usb_verification": "Pending macOS administrator authentication; no USB write has started."
 }

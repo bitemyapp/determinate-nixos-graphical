@@ -149,6 +149,23 @@ Completed in a disposable Linux container on the macOS development host
   [Result](test-results/filesystem-installed-gui.json),
   [login screen](test-results/filesystem-installed-login.png),
   [desktop and application menu](test-results/filesystem-installed-desktop.png).
+- All ten full ISO installation/disk-only reboot cases passed against the
+  corrected image and exact installer pin. Each used-disk case replaces a
+  different filesystem. Btrfs compression survived reboot. The original
+  blank VirtIO/ext4 case also passed.
+  [Complete per-case results](test-results/filesystem-iso-matrix.json).
+
+| Installed target | ext4 | Btrfs | XFS |
+| --- | --- | --- | --- |
+| UEFI NVMe, 512-byte sectors | Passed | Passed | Passed |
+| UEFI NVMe, 4096-byte sectors | Passed | Passed | Passed |
+| BIOS VirtIO | Passed | Passed | Passed |
+| UEFI VirtIO, initially blank | Passed | Not run | Not run |
+
+Two completed installations had their disk-only boot checks resumed after a
+temporary coordinator misread fixture output and interrupted the batch. The
+results retain that lineage. An interrupted, incomplete Btrfs installation
+was rerun in full. No failed or incomplete installation was counted as passed.
 
 UBS was also run and reviewed. It is not a clean scanner gate: its five existing
 critical matches flag the fixed-command wrapper, synthetic unit-test password,
@@ -192,8 +209,8 @@ the match is an inference, not a diagnosis of the physical laptop. The
 same installed disk then booted successfully and passed the unchanged
 filesystem, authentication and service checks with single-threaded TCG.
 
-Outstanding release evidence: the corrected ISO's ten complete-ISO
-install/reboot cases, written-USB checks and the user's physical NVMe retest.
-The successful loop matrix does not establish controller firmware behavior or
-installed-system bootability.
+Outstanding release evidence: written-USB checks and the user's physical NVMe
+retest. Writing the explicitly authorized SanDisk is awaiting macOS
+administrator authentication; no write has started. The completed VM tests do
+not establish the physical ThinkPad controller's firmware behavior.
 The previous ISO and USB verification reports remain historical evidence.
