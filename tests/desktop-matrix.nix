@@ -15,11 +15,12 @@ let
       module
       {
         fileSystems."/" = {
-          device = "/dev/disk/by-label/TEST_ROOT";
+          # Simulate hardware detection choosing aliases from before a reformat.
+          device = "/dev/disk/by-uuid/00000000-0000-0000-0000-000000000000";
           fsType = "ext4";
         };
         fileSystems."/boot" = {
-          device = "/dev/disk/by-label/TEST_BOOT";
+          device = "/dev/disk/by-uuid/0000-0000";
           fsType = "vfat";
         };
       }
@@ -31,6 +32,8 @@ assert system.config.networking.wireless.enable;
 assert system.config.networking.wireless.dbusControlled;
 assert system.config.hardware.enableRedistributableFirmware;
 assert system.config.nixpkgs.config.allowUnfree;
+assert system.config.fileSystems."/".device == "/dev/disk/by-uuid/11111111-2222-3333-4444-555555555555";
+assert system.config.fileSystems."/boot".device == "/dev/disk/by-uuid/A1B2-C3D4";
 {
   derivation = system.config.system.build.toplevel.drvPath;
   defaultSession = system.config.services.displayManager.defaultSession;
@@ -39,4 +42,6 @@ assert system.config.nixpkgs.config.allowUnfree;
   supplicantEnabled = system.config.networking.wireless.enable;
   redistributableFirmware = system.config.hardware.enableRedistributableFirmware;
   allowUnfree = system.config.nixpkgs.config.allowUnfree;
+  rootDevice = system.config.fileSystems."/".device;
+  bootDevice = system.config.fileSystems."/boot".device;
 }

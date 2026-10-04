@@ -1,14 +1,14 @@
 {
   "date": "2026-10-04",
   "check": "checks.x86_64-linux.storage",
-  "installer_revision": "dc4127509d37c0e0d8144159744af0282a165127",
-  "installer_source_hash": "sha256-lg7J1f25Il7kr94RvTztHaRUx+dgNx89PvUw6/1CgOc=",
+  "installer_revision": "2c80fed7af924d9b2a959a8bd4ed70c7f5834cf8",
+  "installer_source_hash": "sha256-qSqyQTyHPhVXs8o+GlLMhvbbHw9AAnbEma4i4R9dJPU=",
   "environment": "NixOS VM under QEMU TCG in a disposable Linux container on macOS",
   "kernel": "6.18.54",
   "nix_outer_sandbox": false,
   "nix_filter_syscalls": false,
   "passed": true,
-  "script_seconds": 179.11,
+  "script_seconds": 204.2,
   "cases": [
     {
       "sector_bytes": 512,
@@ -127,7 +127,9 @@
     "uncached filesystem probe",
     "explicit mount type",
     "write and read after remount",
-    "FAT32 EFI mounts"
+    "FAT32 EFI mounts",
+    "directly probed UUID changes after every replacement",
+    "FAT32 replacement with a primed blkid cache"
   ],
   "limits": [
     "temporary loop devices, not an NVMe controller",

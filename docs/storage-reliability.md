@@ -36,16 +36,20 @@ See [wipefs](https://man7.org/linux/man-pages/man8/wipefs.8.html),
   It wipes signatures on each new partition, formats, and verifies the result
   with uncached `blkid --probe`, refusing ambiguity or a wrong type.
 - After releasing the device lock, it triggers fresh udev probing and waits for
-  UUID metadata, rechecks availability, then mounts with an explicit type.
+  pending events, rechecks availability, then mounts with an explicit type.
   No automatic reformat/retry hides an I/O or mount failure.
+- It probes the newly mounted root and EFI UUIDs directly from their
+  superblocks and pins those device paths with `lib.mkForce` in
+  `configuration.nix`. This overrides hardware detection's possible choice of
+  an obsolete UUID alias for the same partition.
 - Failures save a root-only `/run/calamares-storage-*.log` containing bounded
   partition/probe/kernel diagnostics. The GUI displays selectable, scrollable
   failure details. Logs must be copied before rebooting.
 - The ISO source pin is updated to the companion fix; the installed system's
   existing three-input lock remains unchanged.
 
-Pinned installer: `dc4127509d37c0e0d8144159744af0282a165127`,
-source hash `sha256-lg7J1f25Il7kr94RvTztHaRUx+dgNx89PvUw6/1CgOc=`.
+Pinned installer: `2c80fed7af924d9b2a959a8bd4ed70c7f5834cf8`,
+source hash `sha256-qSqyQTyHPhVXs8o+GlLMhvbbHw9AAnbEma4i4R9dJPU=`.
 The source archive was fetched and hashed with Nix, then successfully imported
 through the ISO's normal `fetchFromGitHub` path.
 
@@ -93,7 +97,7 @@ Completed in a disposable Linux container on the macOS development host
 - All 18 real filesystem replacement/remount cases passed, plus both FAT32
   mounts. Only temporary image-backed loop devices were formatted.
   [Storage matrix output](test-results/filesystem-storage-matrix.log).
-- Full GTK/network build: 33 ordinary runtime tests and six compile-fail
+- Full GTK/network build: 35 ordinary runtime tests and six compile-fail
   doctests passed. The privileged matrix was run separately and passed.
   [Native test output](test-results/filesystem-native-tests.log).
 - Clippy with warnings denied passed for all Linux targets; the separate VM
@@ -104,13 +108,37 @@ Completed in a disposable Linux container on the macOS development host
   launch. This is a device-configuration check, not an installed-system boot.
 - The NixOS VM storage check built and passed the real matrix under QEMU
   emulation, then passed again through the ISO repository's exact published
-  source pin (179 seconds, kernel 6.18.54).
+  source pin (204 seconds, kernel 6.18.54), including UUID replacement checks.
   [NixOS VM result](test-results/filesystem-nixos-vm.json).
   The outer disposable container
   required disabling Nix's incompatible seccomp filter and sandbox; source
   hashes and normal cache verification remained enabled.
 - The pinned NixOS configurations evaluate with all four filesystem drivers
   enabled in all three live profiles.
+- The first candidate rebuilt successfully at `091af7b` with installer
+  `dc4127509d37c0e0d8144159744af0282a165127`: 3,989,078,016 bytes, SHA-256
+  `72ee216339133f0dc72d5e71826f4040217b5b9cfd353a546797b548e2145b5b`.
+  The copied image independently matched the build's checksum.
+  It was rejected during full-ISO testing and was never written to the USB.
+  [Build record](test-results/filesystem-rejected-build.json),
+  [rejected checksum](test-results/filesystem-rejected-iso.sha256).
+- The corrected ISO also rebuilt successfully with installer `2c80fed7a`:
+  3,989,078,016 bytes, SHA-256
+  `2eb35dcb58f8104721a91a35e1e74625c2343a34bdf8adfcd922166806a2a39d`.
+  The copied image independently matched its build checksum, and the complete
+  Nix flake checks passed. [Current build](test-results/filesystem-build.json),
+  [checksum](test-results/filesystem-iso.sha256).
+- All 47 generated desktop configurations evaluated successfully with the
+  current installer pin and unchanged lock.
+  [Desktop matrix](test-results/filesystem-desktop-matrix.json).
+- Cold-building Determinate Nix on this macOS ARM host exposed host translation
+  limitations in upstream tests. The unmodified syscall, store, expression and
+  functional test derivations passed inside full x86_64 NixOS VMs. Their
+  successful outputs were exported back into the build store; no checks were
+  removed to produce the ISO. Upstream skips and disabled tests remain recorded
+  in the [test summary](test-results/filesystem-build-tests.log).
+- The first candidate's actual GTK filesystem menu was opened and visually checked:
+  [ext4, Btrfs and XFS choices](test-results/filesystem-choices.png).
 
 UBS was also run and reviewed. It is not a clean scanner gate: its five existing
 critical matches flag the fixed-command wrapper, synthetic unit-test password,
@@ -119,7 +147,27 @@ warnings are principally assertions/unwraps in tests and bounded allocations;
 they were reviewed with the command ordering and cleanup paths. No broad
 suppression rules were added.
 
-Outstanding release evidence: a rebuilt final ISO, the ten complete-ISO
-install/reboot cases and the user's physical NVMe retest. The successful loop
-matrix does not establish controller firmware behavior or final-image bootability.
+## Additional failure caught by the rebuilt ISO tests
+
+The first candidate completed root formatting, mounting and installation on a
+used 512-byte NVMe disk, then entered emergency mode on reboot. Its generated
+hardware configuration referenced EFI UUID `6099-DDBC`; the actual FAT32
+superblock contained `60F4-E5D4`. A 4Kn NVMe case passed, demonstrating why a
+single successful VM run was insufficient.
+
+The pinned NixOS hardware detector selects the first existing UUID alias with
+the same device number. A stale alias can therefore enter the configuration
+even when explicit mounts and udev settling succeed. The current installer pin
+uses directly probed UUIDs as the authoritative device paths. The desktop
+evaluation matrix now injects incorrect detected root/EFI identities and
+asserts that the generated configuration overrides both. Reused-disk fixtures
+also seed an earlier EFI UUID (`0000-0001`).
+
+[Failure record](test-results/filesystem-uuid-rejection.json) and
+[boot screenshot](test-results/filesystem-uuid-rejection.png).
+
+Outstanding release evidence: the corrected ISO's ten complete-ISO
+install/reboot cases, written-USB checks and the user's physical NVMe retest.
+The successful loop matrix does not establish controller firmware behavior or
+installed-system bootability.
 The previous ISO and USB verification reports remain historical evidence.
