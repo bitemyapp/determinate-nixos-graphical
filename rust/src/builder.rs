@@ -77,6 +77,9 @@ pub fn main(args: Vec<String>) -> Result<()> {
         .open("/dev/kvm")
         .context("KVM is not accessible to this user")?;
     let repo = repo()?;
+    // Build the test-only generator from the exact installer revision. It is
+    // shared into the builder, never included in the ISO.
+    crate::vm::fixture(&repo)?;
     let work = repo.join(".work/rootless");
     fs::create_dir_all(&work)?;
     let lock = work.join("builder.lock");
@@ -295,15 +298,18 @@ pub fn main(args: Vec<String>) -> Result<()> {
             artifacts.join("build.log").display()
         );
         let log = File::create(artifacts.join("build.log"))?;
-        run(ssh(&format!("{GUEST_TOOL} build-iso"))
+        let build_result = run(ssh(&format!("{GUEST_TOOL} build-iso"))
             .stdout(log.try_clone()?)
-            .stderr(log))?;
-        let mut poweroff = Process(ssh("poweroff").spawn()?);
-        let _ = poweroff.wait(Duration::from_secs(20));
+            .stderr(log));
+        // The builder's store is persistent: even a failed build must flush
+        // pending writes and shut down before the QEMU process is reaped.
+        let mut poweroff = Process(ssh("sync && poweroff").spawn()?);
+        let _ = poweroff.wait_cleanup(Duration::from_secs(20));
         ensure!(
-            qemu.wait(Duration::from_secs(60))?.success(),
+            qemu.wait_cleanup(Duration::from_secs(60))?.success(),
             "Builder shutdown failed"
         );
+        build_result?;
         Ok(())
     })();
     stop.store(true, Ordering::Relaxed);
@@ -381,6 +387,7 @@ pub fn build_iso() -> Result<()> {
         fs::read_to_string("/sys/class/block/vda/serial")?.trim() == "RESPIN_BUILDER_ONLY",
         "Not the builder VM"
     );
+    check_desktops()?;
     run(Command::new("nix")
         .current_dir("/workspace")
         .env("TMPDIR", "/build/tmp")
@@ -426,6 +433,95 @@ pub fn build_iso() -> Result<()> {
     }
     ensure!(found, "Build output contained no ISO");
     run(&mut Command::new("sync"))?;
+    Ok(())
+}
+
+fn check_desktops() -> Result<()> {
+    let repo = Path::new("/workspace");
+    let pin: serde_json::Value =
+        serde_json::from_slice(&fs::read(repo.join("nix/calamares-source.json"))?)?;
+    let rev = pin["rev"].as_str().context("Missing revision")?;
+    ensure!(
+        rev.len() == 40 && rev.bytes().all(|c| c.is_ascii_hexdigit()),
+        "Invalid revision"
+    );
+    let fixture = repo
+        .join(".work/native-fixture")
+        .join(rev)
+        .join("bin/calamares-vm-fixture");
+    let configurations = output(Command::new(fixture).arg("desktop-configurations"))?;
+    let cases: std::collections::BTreeMap<String, String> = serde_json::from_str(&configurations)?;
+    ensure!(
+        cases.len() == 47,
+        "Expected all 47 supported desktop combinations"
+    );
+    let path = repo.join(".work/desktop-configurations.json");
+    fs::write(&path, configurations)?;
+    let modules = repo.join(".work/desktop-modules");
+    fs::create_dir_all(&modules)?;
+    for (name, source) in &cases {
+        ensure!(
+            name.bytes().all(|c| c.is_ascii_lowercase() || c == b'-'),
+            "Invalid desktop case name"
+        );
+        let source = source.replace("imports = [ ./hardware-configuration.nix ];", "");
+        let mut file = File::create(modules.join(format!("{name}.nix")))?;
+        file.write_all(source.as_bytes())?;
+        file.sync_all()?;
+    }
+    let cache = repo.join("artifacts/native-rust/desktop-matrix.json");
+    let fingerprint = format!(
+        "{}:{}:{}",
+        sha256(&path)?,
+        sha256(&repo.join("flake.lock"))?,
+        sha256(&repo.join("tests/desktop-matrix.nix"))?
+    );
+    if fs::read(&cache)
+        .ok()
+        .and_then(|v| serde_json::from_slice::<serde_json::Value>(&v).ok())
+        .is_some_and(|v| {
+            v["fingerprint"] == fingerprint
+                && v["cases"]
+                    .as_object()
+                    .is_some_and(|c| c.len() == cases.len())
+        })
+    {
+        println!(
+            "PASS: cached desktop evaluations match the current generated configurations, test expression and pinned lock"
+        );
+        return Ok(());
+    }
+    let mut results = std::collections::BTreeMap::<String, serde_json::Value>::new();
+    let names: Vec<_> = cases.keys().collect();
+    // Four independent evaluations fit in the 12-GiB builder. Keep bounded
+    // parallelism rather than spawning one evaluator per desktop combination.
+    for batch in names.chunks(4) {
+        let evaluated = thread::scope(|scope| -> Result<Vec<(String, serde_json::Value)>> {
+            let jobs: Vec<_> = batch.iter().map(|name| scope.spawn(move || -> Result<_> {
+                ensure!(name.bytes().all(|c| c.is_ascii_lowercase() || c == b'-'), "Invalid desktop case name");
+                println!("Evaluating desktop selection: {name}");
+                let apply = format!("f: f {{ configurations = \"/workspace/.work/desktop-configurations.json\"; caseName = \"{name}\"; }}");
+                let result = output(Command::new("nix").current_dir(repo).args([
+                    "eval", "--impure", "--json", "--file", "tests/desktop-matrix.nix", "--apply", &apply,
+                ]))?;
+                Ok(((*name).clone(), serde_json::from_str(&result)?))
+            })).collect();
+            jobs.into_iter()
+                .map(|job| {
+                    job.join()
+                        .map_err(|_| anyhow::anyhow!("Desktop evaluator worker panicked"))?
+                })
+                .collect()
+        })?;
+        results.extend(evaluated);
+    }
+    fs::write(
+        cache,
+        serde_json::to_vec_pretty(
+            &serde_json::json!({"fingerprint":fingerprint,"installer_revision":rev,"cases":results}),
+        )?,
+    )?;
+    println!("PASS: all 47 supported desktop combinations evaluate against pinned NixOS");
     Ok(())
 }
 

@@ -82,6 +82,18 @@ pub fn output(command: &mut Command) -> Result<String> {
 
 pub struct Process(pub Child);
 impl Process {
+    /// Bounded shutdown grace that must still run after Ctrl-C. Only use for
+    /// cleanup (for example flushing and powering off the persistent builder).
+    pub fn wait_cleanup(&mut self, timeout: Duration) -> Result<ExitStatus> {
+        let end = Instant::now() + timeout;
+        loop {
+            if let Some(status) = self.0.try_wait()? {
+                return Ok(status);
+            }
+            ensure!(Instant::now() < end, "Cleanup process timed out");
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
     pub fn wait(&mut self, timeout: Duration) -> Result<ExitStatus> {
         let end = Instant::now() + timeout;
         loop {
@@ -194,5 +206,15 @@ mod tests {
         std::os::unix::fs::symlink(&file, &link).unwrap();
         assert!(regular(&link).is_err());
         assert_eq!(fs::metadata(file).unwrap().len(), 1024);
+    }
+    #[test]
+    fn cleanup_wait_reaps_a_completed_child() {
+        let mut child = Process(Command::new("true").spawn().unwrap());
+        assert!(
+            child
+                .wait_cleanup(Duration::from_secs(2))
+                .unwrap()
+                .success()
+        );
     }
 }

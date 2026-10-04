@@ -42,13 +42,19 @@ in
     })
   ];
   # No blanket wheel grant from the graphical base. Only the local active live
-  # user may start this exact helper without a password; other policies remain.
+  # user may start this exact helper without a password. Keep live networking
+  # usable too: mkForce replaces NetworkManager's normal group-based rule.
   security.polkit.enable = true;
   security.polkit.enablePkexecWrapper = true;
   security.polkit.extraConfig = lib.mkForce ''
     polkit.addRule(function(action, subject) {
       if (action.id == "org.calamares.nixos.install" &&
           subject.user == "nixos" && subject.local && subject.active) {
+        return polkit.Result.YES;
+      }
+      if (action.id.indexOf("org.freedesktop.NetworkManager.") == 0 &&
+          subject.user == "nixos" && subject.local && subject.active &&
+          subject.isInGroup("networkmanager")) {
         return polkit.Result.YES;
       }
     });

@@ -301,7 +301,7 @@ impl Drop for Vm {
     }
 }
 
-fn fixture(repo: &Path) -> Result<String> {
+pub(crate) fn fixture(repo: &Path) -> Result<String> {
     let pin: Value = serde_json::from_slice(&fs::read(repo.join("nix/calamares-source.json"))?)?;
     let revision = pin["rev"].as_str().context("Missing installer revision")?;
     ensure!(
@@ -363,7 +363,18 @@ fn verify_installed(
         crate::gui_input::type_text(&mut qmp, "Qemu-Only-Test-123!")?;
         crate::gui_input::key(&mut qmp, &["ret"])?;
         drop(qmp);
-        vm.execute("for i in $(seq 1 90); do pgrep -u 1000 -f '^/[^ ]+/bin/[.]?plasmashell' && exit 0; sleep 1; done; exit 1", SHORT)?;
+        let process = if output.lines().any(|line| line == "DESKTOP_SESSION=xfce") {
+            "xfce4-session"
+        } else if output.lines().any(|line| line == "DESKTOP_SESSION=plasma") {
+            "plasmashell"
+        } else {
+            bail!(
+                "GUI login automation supports Plasma or Xfce only; other desktops are evaluated separately"
+            );
+        };
+        // Session managers can use a bare argv[0], a bin/libexec path, or a
+        // Nix wrapper. Match the exact program token, not a hard-coded path.
+        vm.execute(&format!("for i in $(seq 1 90); do pgrep -u 1000 -f '(^|/)[.]?{process}(-wrapped)?( |$)' && exit 0; sleep 1; done; exit 1"), SHORT)?;
         pause(Duration::from_secs(10))?;
     }
     vm.screenshot(&artifacts.join("installed-desktop.png"))?;
@@ -498,6 +509,12 @@ pub fn main(args: Vec<String>) -> Result<()> {
                     Duration::from_secs(7500),
                 )?;
             }
+            let live_wifi = vm.execute("nmcli --get-values connection.permissions connection show uuid 135ea3d9-d456-44b1-ae42-1e7081f66666", SHORT)?;
+            ensure!(
+                live_wifi.contains("nixos") && !live_wifi.contains("rusttest"),
+                "Wi-Fi migration modified the live connection instead of a copy"
+            );
+            result["live_wifi_unchanged"] = json!(true);
             result["backend_completed"] = json!(true);
             vm.poweroff()?;
             fs::copy(work.join("serial.log"), artifacts.join("live-serial.log"))?;
@@ -550,7 +567,8 @@ pub fn boot_installed(args: Vec<String>) -> Result<()> {
         fs::metadata(&disk)?.len() == 40 * 1024u64.pow(3),
         "Wrong test disk size"
     );
-    let name = format!("{name}-boot-{}", stamp());
+    // Keep AF_UNIX socket paths short; lineage is recorded in resumed_from.
+    let name = format!("boot-{firmware}-{}", stamp());
     let work = repo.join(".work").join(&name);
     let artifacts = repo.join("artifacts").join(&name);
     fs::create_dir(&work)?;
