@@ -146,10 +146,15 @@ used after 60 minutes in the NixOS build phase. Full-system evaluation and copyi
 still happen after pressing Install; package caching alone does not establish
 the requested completion time.
 
-The SanDisk handoff verifies the complete written image against its source and
-checksum. Physical boot, installation completion and elapsed time remain for
-the user's hardware test. The earlier filesystem-only image was archived and
-was never written to this SanDisk.
+The SanDisk write completed: every one of the 9,560,510,464 image bytes matched
+the source and checksum, the stale backup partition-table area was cleared and
+checked, and the drive was ejected. Writing took 311.1 seconds and full read-back
+87.2 seconds; these are Mac USB-transfer timings, not NixOS installation timings.
+[USB report](test-results/sandisk-readback.json),
+[write log](test-results/sandisk-hardware-flash.log).
+Physical boot, installation completion and elapsed time remain for the user's
+hardware test. The earlier filesystem-only image was archived and was never
+written to this SanDisk. See the [agent handoff](agent-handoff.md) for resumption.
 
 ## Cold-module preflight regression
 
