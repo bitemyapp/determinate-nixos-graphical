@@ -95,7 +95,7 @@ See [filesystem reliability](storage-reliability.md) for the original NVMe
 failure and the used-disk, 4Kn and legacy BIOS regression cases. Emulator passes
 do not establish the behavior of the physical ThinkPad's controller or firmware.
 
-## Validation in progress
+## Validation and hardware handoff
 
 The packaged installer passed 41 library tests, one GUI model test and six
 compile-fail doctests. The separately invoked storage VM passed all 18 real
@@ -125,13 +125,31 @@ install checks. The complete Nix flake checks passed. The corrected application 
 An independent hash of the copied image matched the build output.
 [Build record](test-results/application-build.json),
 [checksum](test-results/application-iso.sha256). The previous application
-candidate also passed a separate [BIOS live-boot smoke test](test-results/application-bios-live.json) passed,
+candidate also passed a separate [BIOS live-boot smoke test](test-results/application-bios-live.json),
 checking Linux, desktop/installer processes and Determinate Nix startup. This
 process check does not claim rendered GUI readiness or an installed-system boot.
 
-The new ISO installation/runtime tests and SanDisk write/read-back are still
-pending. The earlier filesystem-only image was archived and was never written
-to this SanDisk.
+At the user's request, the ten final-image installation tests were stopped to
+prepare the SanDisk for immediate physical-hardware testing. All ten had reached
+the NixOS build/install phase, past filesystem preparation, formatting and
+mounting; none had completed an installed-system boot. These are incomplete
+tests, not passes. Installed application runtime and desktop startup tests have
+not run. Logs and disposable disks are retained in the local artifacts.
+[Handoff record](test-results/application-hardware-handoff.json).
+
+The requested performance target is less than 60 seconds from pressing Install
+after providing all inputs to installation completion on physical hardware.
+This image has not demonstrated that target. Cross-architecture QEMU timing on
+the ARM Mac is not a physical-hardware benchmark. The all-applications guest was
+actively copying/building the target system when interrupted, with about 9.9 GiB
+used after 60 minutes in the NixOS build phase. Full-system evaluation and copying
+still happen after pressing Install; package caching alone does not establish
+the requested completion time.
+
+The SanDisk handoff verifies the complete written image against its source and
+checksum. Physical boot, installation completion and elapsed time remain for
+the user's hardware test. The earlier filesystem-only image was archived and
+was never written to this SanDisk.
 
 ## Cold-module preflight regression
 
@@ -145,7 +163,8 @@ The installer now allows 120 seconds for root/EFI filesystem module loading,
 reports filesystem preparation in its progress text, and preserves the
 underlying error with an explicit statement that no disk writes occurred.
 A regression test checks both root and EFI module failures. The corrected ISO
-has been rebuilt and its full installation matrix is in progress. The original
+has been rebuilt; its full installation matrix was interrupted for the requested
+hardware handoff described above. The original
 [rejected build record](test-results/application-rejected-build.json) is retained.
 
 The full-install harness also allows both of the installer's separate
@@ -155,4 +174,5 @@ This changes test supervision only; installer deadlines remain unchanged.
 The original all-applications run subsequently reached that old outer deadline
 while the backend was still installing and is retained as an
 [interrupted test](test-results/application-harness-timeout.json), never a pass.
-The corrected image is undergoing a fresh full installation.
+The corrected image's unfinished tests are recorded separately in the hardware
+handoff record.
