@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "store_path": "/nix/store/ka0rs4dv8m2jmzwwjwclwwz0x2vvk3x6-nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso/iso/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso",
+  "iso_sha256": "69d989e31b74465ff9ce076cb6116159497a8d960ba198832cb90507a5d174ed",
+  "bytes": 11913076736,
+  "installer_revision": "cd054b949bb8fadec39f92530227c8b97fd6da99",
+  "flake_lock_sha256": "1ab98c5950de5484c81f3d1c52c5a657d0247e3eecb21c0c9cada9b8472ee079",
+  "flake_checks_passed": true,
+  "notes": "Pure build of the pinned installer on wx-workstation; nix flake check (including the storage VM test) passed; 191 desktop and 34 application configurations evaluated; VM install verified (UEFI/NVMe/ext4, Plasma + Omarchy, 44.4 s click-to-complete). Mac copy checksum matched."
+}

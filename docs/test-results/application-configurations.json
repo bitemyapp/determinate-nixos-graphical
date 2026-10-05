@@ -1,8 +1,12 @@
 {
-  "cases": {
+  "passed": true,
+  "installer_revision": "cd054b949bb8fadec39f92530227c8b97fd6da99",
+  "flake_lock_sha256": "1ab98c5950de5484c81f3d1c52c5a657d0247e3eecb21c0c9cada9b8472ee079",
+  "source": "respin-tools check-selections (rust/src/builder.rs) with the fixture built from the pinned installer revision",
+  "application_cases": {
     "all": {
       "allowUnfree": true,
-      "derivation": "/nix/store/pnjdczq4ik5zqsbcdpbc0qhvs6yh386b-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/6q990wnkrd0xb13mv09zmnzlr4qv5xfj-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": true,
       "manifest": {
         "packages": [
@@ -240,7 +244,7 @@
     },
     "bitwarden": {
       "allowUnfree": false,
-      "derivation": "/nix/store/rx4y40rr2la206yxkb9xl4qf2cr1hynh-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/1apada0gdk0vkl82sy90n364kh62vbv7-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -258,7 +262,7 @@
     },
     "build-tools": {
       "allowUnfree": false,
-      "derivation": "/nix/store/hpy35nvgwjzv5nm2mfgf6mzvjzsqim3x-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/9wk25amfl2n5qnpvd9c84hjy904a4zlb-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -311,7 +315,7 @@
     },
     "chatgpt": {
       "allowUnfree": true,
-      "derivation": "/nix/store/k4vpbniaic9l3lzsabvsgc0wk96m5lj8-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/xw2zj5bjysf57ksvs55wh506wbq08ywf-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -329,7 +333,7 @@
     },
     "chromium": {
       "allowUnfree": false,
-      "derivation": "/nix/store/alxh71pkjfch61bmly29zq2hn70vrdh1-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/2zpn1wl5qrgrpddkq2ay4d2brif3ymbw-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -347,7 +351,7 @@
     },
     "claude-code": {
       "allowUnfree": true,
-      "derivation": "/nix/store/jq0hd1005rs5hck287hli84iiy1ymymx-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/l1dhrsbrmk8kcjyi4xq1r7j6kzzavbyj-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -365,7 +369,7 @@
     },
     "claude-desktop": {
       "allowUnfree": true,
-      "derivation": "/nix/store/xb5vf6pbhmll26dpnpycl2kkdwap3zn8-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/ipqq54j16n250mnswbd6g31s3b1s1dl9-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -383,7 +387,7 @@
     },
     "codex": {
       "allowUnfree": false,
-      "derivation": "/nix/store/7qpxknssn949agi8lz3xqr43dfdi1prm-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/yzf7lzxqf2j7p3hivyv74shy9r4vx738-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -401,7 +405,7 @@
     },
     "discord": {
       "allowUnfree": true,
-      "derivation": "/nix/store/qnyii2anzifaprnrj7ilahkdc9dsm5qy-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/87x461rlm1jkbl0xpvzkw3imrnxpprc5-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -419,7 +423,7 @@
     },
     "docker": {
       "allowUnfree": false,
-      "derivation": "/nix/store/zrpfb6zg2n0wddjqk1jbdxvm61a8w9l2-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/h0afh442168q9pxcykci0ngqkm01gca6-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": true,
       "manifest": {
         "packages": [
@@ -442,7 +446,7 @@
     },
     "firefox": {
       "allowUnfree": false,
-      "derivation": "/nix/store/z2sw0bfp518mww1x3hr5hmn2bplqb75q-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/8pk190dkwgmggl1xzi2yi0pb4qv0gkls-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -460,7 +464,7 @@
     },
     "free-only": {
       "allowUnfree": false,
-      "derivation": "/nix/store/6i3sj4ixcp3vsfpsx5gwghgr8a677xlp-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/lsq3mi88jcxhz4ndz4agq2s1j5aplam0-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": true,
       "manifest": {
         "packages": [
@@ -638,7 +642,7 @@
     },
     "ghostty": {
       "allowUnfree": false,
-      "derivation": "/nix/store/m5rhn5vfhnrn9nvyad2jwg06d4p1fbg0-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/nwn4rjikljrzazd9k2f9pa0iclcb0993-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -656,7 +660,7 @@
     },
     "gimp": {
       "allowUnfree": false,
-      "derivation": "/nix/store/jyaygi95nxyfsacwrbz351prccc4pbdd-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/ss1sl9hzgh65bx4yylqcgp0plfmwqpdj-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -674,7 +678,7 @@
     },
     "google-chrome": {
       "allowUnfree": true,
-      "derivation": "/nix/store/l78c8n5wv9qxd11jwmchxh7k0zq3sidh-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/8qkn0j01g1g2r88pphyl21s9ilkc8rhh-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -692,7 +696,7 @@
     },
     "inkscape": {
       "allowUnfree": false,
-      "derivation": "/nix/store/0d71dilpzkcs2c68cxks33rb3xlrdl5g-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/vfnzpwylkd4sd6whs3pfhas072ynfmbp-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -710,7 +714,7 @@
     },
     "kitty": {
       "allowUnfree": false,
-      "derivation": "/nix/store/r50yv99xzhnavmd008v9pgqpwhxkkm4m-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/4rl0jif5hhzkgyh1mydgdbw6yk9b8whh-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -728,7 +732,7 @@
     },
     "lazygit": {
       "allowUnfree": false,
-      "derivation": "/nix/store/aj3qqcgww8lrkcdqxalbphhmhgsxx1iy-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/qsjhf3f1sd5h7l7v75ral2is4pk46c1k-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -751,7 +755,7 @@
     },
     "libreoffice": {
       "allowUnfree": false,
-      "derivation": "/nix/store/r810vkmbi3zlahbzczd46dg7qp8bsya4-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/bjh11fjz9794g6yv5zph13dshh7z3zyk-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -769,7 +773,7 @@
     },
     "neovim": {
       "allowUnfree": false,
-      "derivation": "/nix/store/ghcgw9hfbdy3vzzlpd5zg1a06cgrmzz9-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/db00wyr8ppk7xkh5gcx5w40s6g5asjkg-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -787,7 +791,7 @@
     },
     "none": {
       "allowUnfree": false,
-      "derivation": "/nix/store/gfmaa394z668792b5w0ajpl7nsg1gx0m-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/13zzjrdgx9wbsybvvs2365n6zxcswlka-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [],
@@ -797,7 +801,7 @@
     },
     "obs-studio": {
       "allowUnfree": false,
-      "derivation": "/nix/store/8p0zw54bm3rg80r5ainj67w95q9d2a3h-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/756pl1lqny5ydl57lqqn6n8rxl1k934m-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -815,7 +819,7 @@
     },
     "obsidian": {
       "allowUnfree": true,
-      "derivation": "/nix/store/h6jj72vqqwz48cg2qd9rfwqpy7hf09yk-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/zh21fk04n3g4qa9kxdqd43w8gi18jv0z-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -833,7 +837,7 @@
     },
     "oh-my-pi": {
       "allowUnfree": false,
-      "derivation": "/nix/store/p6ygknbxczi7v60rsrizkck67agd1y88-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/qk7ds1b924h2h1821jcswak8jxpybfr6-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -851,7 +855,7 @@
     },
     "opencode": {
       "allowUnfree": false,
-      "derivation": "/nix/store/xsf55vr63g06qb6x577dw30af17sgd39-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/yf5ymg4ykaxlmiwpngzqjgpcqawkm8bb-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -869,7 +873,7 @@
     },
     "rustup": {
       "allowUnfree": false,
-      "derivation": "/nix/store/7c66wfkfv94h60l3ngspx81k2d71619k-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/ds9lxvx9rn8w39lp266xjj973mdwy9fr-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -928,7 +932,7 @@
     },
     "signal": {
       "allowUnfree": false,
-      "derivation": "/nix/store/fph283kl7cz1q371da2a873qyg0ss8rm-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/dpnnjansafbapg04bgcnm957a4hr5k86-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -946,7 +950,7 @@
     },
     "slack": {
       "allowUnfree": true,
-      "derivation": "/nix/store/6432vqrygj1rc74ir9kc4p34mn5p0asf-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/d1lq1sra7djhpsiqnb38w02za7ihfgks-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -964,7 +968,7 @@
     },
     "spotify": {
       "allowUnfree": true,
-      "derivation": "/nix/store/scd1vx8mywln5vnnnqp1iab4m8ni25nz-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/hjr8nd6bsh81h3gagc3ik43702wc9g9w-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -982,7 +986,7 @@
     },
     "steam": {
       "allowUnfree": true,
-      "derivation": "/nix/store/kww41w1dwiv82dfcd5cf2cgbd1y0i6vl-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/7w3a9kncnlv98xcnvdi9l8w3xgrxzbf2-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -1000,7 +1004,7 @@
     },
     "telegram": {
       "allowUnfree": false,
-      "derivation": "/nix/store/hwswspjdhgpzhb91qlc6n9iagsbf1i85-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/d9gsdhn2k51fiv0yh8cc217gnf4agp75-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -1018,7 +1022,7 @@
     },
     "vlc": {
       "allowUnfree": false,
-      "derivation": "/nix/store/czapmi8n19kjlg50z52wb7ir69bmnj8b-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/m4q532ph4vg0a1x0p5inx6zipmiblz12-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -1036,7 +1040,7 @@
     },
     "vscode": {
       "allowUnfree": true,
-      "derivation": "/nix/store/z2mx8yj70mgkj2py07xgmq1kwcrddm92-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/20kl5qxsdq29brzn207399r7kl5h9isb-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -1054,7 +1058,7 @@
     },
     "zed": {
       "allowUnfree": false,
-      "derivation": "/nix/store/j9y6kz65xivpkjg6q486dm96jhiak3vc-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
+      "derivation": "/nix/store/6hpgbdim8xbqz0mzr6d4jq8nq3byqc7r-nixos-system-desktop-test-26.11.20261001.c59305b.drv",
       "dockerLinger": null,
       "manifest": {
         "packages": [
@@ -1071,9 +1075,5 @@
       "rootlessDocker": false
     }
   },
-  "fingerprint": "4010f6f08f979af4daba6adcc7a5dad0bd910f8efd04f813442d70070ac51049:1ab98c5950de5484c81f3d1c52c5a657d0247e3eecb21c0c9cada9b8472ee079:206af29bc2a022d33fb1440edd5038affd69e5a99f68d93376eaca505df0a9b8:3aeac89ade48b1506399615efa0b1f5b5616271ce3bc23f985f39ceca59a9f69:5886e2fdacacd5d1e54e9ce6fd38ea20a94ef321e88f0f8410d6260991054c68:482ead0758eb5ea10a7a88f766a0b3c1cf86b393ff0859d713c93617c4a6a2d3:2d12d776bb8f402873938850b7417e718e6b24d69d01ab86ca5f1d0743604c7f",
-  "installer_revision": "8547c691978b76c39a6fcbdcaf67d782331d1adb",
-  "passed": true,
-  "flake_lock_sha256": "1ab98c5950de5484c81f3d1c52c5a657d0247e3eecb21c0c9cada9b8472ee079",
-  "generated_configurations_sha256": "4010f6f08f979af4daba6adcc7a5dad0bd910f8efd04f813442d70070ac51049"
+  "desktop_case_count": 191
 }

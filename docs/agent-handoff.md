@@ -38,21 +38,29 @@ Both repositories use the branch `claude/fast-install-hyprland`, created from
 
 `nix/calamares.nix` accepts `RESPIN_CALAMARES_SRC=/abs/checkout` with
 `--impure` for development builds. Pure builds use the pinned revision in
-`nix/calamares-source.json`: Calamares `e825ac296833fb5faa942b5fd5f7b5afecb1da91`
-on `claude/fast-install-hyprland`, pushed to GitHub. Both branches are pushed;
+`nix/calamares-source.json`: Calamares `cd054b949bb8fadec39f92530227c8b97fd6da99`
+on `claude/fast-install-hyprland`, pushed to GitHub. It follows `e825ac2` with
+only a storage-test ordering fix found by `nix flake check`. Both branches are pushed;
 neither is merged.
 
 ## Candidate images
 
-**Final candidate** (application cache plus all eight prebuilt desktops), built
-impurely from the local installer tree:
-`wx-workstation:~/work/dng/release-iso/iso/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`,
-11,913,035,776 bytes, SHA-256
-`bce81f550fc460a07eccc6773414162d38d4af6fe736df29a871b2ab99cd7b90`.
-A pure build from the pushed pin (`nix build .#iso`, no override) reproduces
-this exact SHA-256. It differs from `1e1253a4…` (screenshots,
-GUI-driven XFS install, BIOS/Omarchy install) only by readable Nix failure
-reports.
+**Final image** (application cache plus all eight prebuilt desktops): a pure
+build of this repository at its pinned installer `cd054b9`, without overrides.
+`nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`,
+11,913,076,736 bytes, SHA-256
+`69d989e31b74465ff9ce076cb6116159497a8d960ba198832cb90507a5d174ed`.
+It is on the workstation at `~/work/dng/pure-iso/iso/` and on the Mac at
+`artifacts/fast-install/`.
+- `nix flake check` passed, including the storage VM test.
+- 191 desktop and 34 application configurations passed.
+- A VM install was verified: 44.4 s from click to completion.
+- Evidence: `docs/test-results/fast-install-*.json` and
+  `docs/test-results/application-configurations.json`.
+
+`bce81f55…`, which carried the GUI screenshots and the other VM runs, differs
+from this image only by a storage-test ordering fix (test code). That fix
+changes the source hash, and therefore the image hash.
 
 The previous candidate `201a7c40…` (11,912,892,416 bytes) passed the first
 GUI-driven install. The final candidate adds: zram hidden from the disk list,
