@@ -1,10 +1,10 @@
 {
  "passed": true,
- "store_path": "/nix/store/17bk84allmcsbrd70kfa4rhncnz5kb70-nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso/iso/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso",
- "iso_sha256": "4f7621f035767d4ab78609d4b3ad724b457605af847ad593214fee004cf99cb1",
- "bytes": 11910500352,
- "installer_revision": "1e14e4d448656b3b5f117dabd1c78b4ade2ca1bc",
- "flake_lock_sha256": "1ab98c5950de5484c81f3d1c52c5a657d0247e3eecb21c0c9cada9b8472ee079",
+ "store_path": "/nix/store/wxg8jv3883yflqayqy8vwvrd3byfjrgf-nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso/iso/nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso",
+ "iso_sha256": "7753ef754277ac0676466ec75c2f48b433215ac12fe397045ba2599eb225ad93",
+ "bytes": 12441305088,
+ "installer_revision": "0cbb39e2c42ab4b0a05690a7727dd69dea051545",
+ "flake_lock_sha256": "117a39d4e1991c3431e61b74ec39723d2652b4ac3e6e567765060613924b338a",
  "flake_checks_passed": true,
- "notes": "Pure build of the pinned installer on wx-workstation; nix flake check (including the storage VM test) passed; 191 desktop and 34 application configurations evaluated; all-inclusive VM install verified (UEFI/NVMe/ext4, Plasma, GNOME, Xfce, MATE, LXQt, Hyprland and Omarchy with all 31 applications, 34.2 GB closure, 130.4 s click-to-complete while the configuration matrices ran on the same host). Mac copy checksum matched."
+ "notes": "Pure build of the pinned installer on wx-workstation, with NVIDIA's driver (615.71.09, open kernel modules) for the latest and LTS kernels; nix flake check passed (storage VM test, nvidia-on-media, calamares-pin); 191 desktop and 34 application configurations evaluated; all-inclusive VM install verified (UEFI/NVMe/ext4, seven desktops, all 31 applications, 34.2 GB closure, 121.4 s click-to-complete while the matrices ran on the same host; no NVIDIA GPU in the VM). Installed systems import modules from the calamares flake input. Mac copy checksum matched."
 }

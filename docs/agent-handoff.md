@@ -73,31 +73,49 @@ Both repositories use the branch `claude/fast-install-hyprland`, created from
 
 `nix/calamares.nix` accepts `RESPIN_CALAMARES_SRC=/abs/checkout` with
 `--impure` for development builds. Pure builds use the pinned revision in
-`nix/calamares-source.json`: Calamares `1e14e4d448656b3b5f117dabd1c78b4ade2ca1bc`
-on `claude/fast-install-hyprland`, pushed to GitHub (the October 5 fixes on top
-of `cd054b9`). Both branches are pushed; neither is merged.
+`nix/calamares-source.json` and the `calamares` flake input: Calamares
+`0cbb39e2c42ab4b0a05690a7727dd69dea051545`. `respin-tools pin-calamares REV`
+updates both, and the `calamares-pin` check keeps them in agreement. The input
+tracks `stable`, as installed systems do.
+
+Branches, in both repositories: `claude/fast-install-hyprland` is this work,
+pushed and not merged. `stable` is what installed systems follow (calamares)
+and what release images are built from (graphical). Move it only to verified
+revisions. The default branches (`calamares`, `codex/graphical-installer`) are
+for reviewed, merged work.
+
+Installed systems import the installer's modules from the `calamares` input
+(`nixosModules.default`) instead of copies in `/etc/nixos`. Verified:
+`nix flake update calamares` then a rebuild on a new-layout VM, and the
+documented conversion of an old-layout VM. Both produced the identical system.
 
 ## Candidate images
 
-**Final image** (application cache plus all eight prebuilt desktops): a pure
-build of this repository at its pinned installer `1e14e4d`, without overrides.
+**Final image** (application cache, all eight prebuilt desktops and NVIDIA's
+driver for both kernels): a pure build of this repository at its pinned
+installer `0cbb39e`, without overrides.
 `nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`,
-11,910,500,352 bytes, SHA-256
-`4f7621f035767d4ab78609d4b3ad724b457605af847ad593214fee004cf99cb1`.
-It is on the workstation at `~/work/dng/pure-iso/iso/` and on the Mac at
-`artifacts/fast-install-oct5/`. `.work/flash-sandisk-fast-install.command`
+12,441,305,088 bytes, SHA-256
+`7753ef754277ac0676466ec75c2f48b433215ac12fe397045ba2599eb225ad93`.
+It is on the workstation at `~/work/dng/pure-iso3/iso/` and on the Mac at
+`artifacts/fast-install-nvidia/`. `.work/flash-sandisk-fast-install.command`
 writes it to the SanDisk.
-- `nix flake check` passed, including the storage VM test.
+- `nix flake check` passed: storage VM test, `nvidia-on-media` (installed
+  systems use the driver build on the media for both kernels) and
+  `calamares-pin`.
 - 191 desktop and 34 application configurations passed.
 - An all-inclusive VM install passed: Plasma, GNOME, Xfce, MATE, LXQt,
-  Hyprland and Omarchy with all 31 applications. It took 130.4 s from click to
+  Hyprland and Omarchy with all 31 applications. It took 121.4 s from click to
   completion for a 34.2 GB closure, while the configuration matrices ran on
-  the same host.
+  the same host. The VM has no NVIDIA GPU; the live system booted normally.
+- Not yet verified on NVIDIA hardware. The Acer Predator Helios Neo 14 (hybrid
+  Intel and NVIDIA) is the first target.
 - Evidence: `docs/test-results/fast-install-*.json` and
   `docs/test-results/application-configurations.json`.
 
-The previous final image, `69d989e3…` at installer `cd054b9`, is the one the
-user installed on the X1 Carbon. It remains in `artifacts/fast-install/`.
+Earlier images: `4f7621f0…` (installer `1e14e4d`, old layout, nouveau) in
+`artifacts/fast-install-oct5/`, and `69d989e3…` (installer `cd054b9`, the one
+installed on the X1 Carbon) in `artifacts/fast-install/`.
 
 `bce81f55…`, which carried the GUI screenshots and the other VM runs, differs
 from this image only by a storage-test ordering fix (test code). That fix

@@ -1,7 +1,7 @@
 {
  "passed": true,
- "installer_revision": "1e14e4d448656b3b5f117dabd1c78b4ade2ca1bc",
- "flake_lock_sha256": "1ab98c5950de5484c81f3d1c52c5a657d0247e3eecb21c0c9cada9b8472ee079",
+ "installer_revision": "0cbb39e2c42ab4b0a05690a7727dd69dea051545",
+ "flake_lock_sha256": "117a39d4e1991c3431e61b74ec39723d2652b4ac3e6e567765060613924b338a",
  "source": "respin-tools check-selections (rust/src/builder.rs) with the fixture built from the pinned installer revision",
  "application_cases": {
   "all": {
