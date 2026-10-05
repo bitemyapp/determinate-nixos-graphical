@@ -5,7 +5,6 @@
 # while the user is still choosing.
 {
   inputs,
-  calamares,
   applicationCatalog,
   desktops,
 }:
@@ -20,7 +19,8 @@ let
       inherit (applicationCatalog) specialArgs;
       modules = [
         inputs.determinate.nixosModules.default
-        (import "${calamares.root}/rust/reference.nix" { desktops = [ desktop ]; })
+        # The same locked modules installed systems import.
+        (import "${inputs.calamares}/rust/reference.nix" { desktops = [ desktop ]; })
       ];
     };
   systems = lib.genAttrs desktops evaluate;

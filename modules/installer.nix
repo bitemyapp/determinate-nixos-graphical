@@ -8,11 +8,14 @@
   ...
 }:
 let
-  calamares = import ../nix/calamares.nix { inherit pkgs; };
+  calamares = import ../nix/calamares.nix {
+    inherit pkgs;
+    source = inputs.calamares;
+  };
   diagnostics = import ../nix/live-diagnostics.nix { inherit pkgs; };
-  applicationCatalog = import ../nix/applications.nix { inherit inputs calamares; };
+  applicationCatalog = import ../nix/applications.nix { inherit inputs; };
   references = import ../nix/reference-systems.nix {
-    inherit inputs calamares applicationCatalog;
+    inherit inputs applicationCatalog;
     desktops = config.respin.referenceDesktops;
   };
   settings =
@@ -136,6 +139,9 @@ in
     # No Python patch, global-storage bridge or nixos-generate-config override.
     environment.etc."calamares-nixos/flake.nix.in".source = ../templates/flake.nix.in;
     environment.etc."calamares-nixos/flake.lock".source = ../flake.lock;
+    # The installed flake's `calamares` input is locked to this source: with
+    # it in the live store, preparing an installation need not download it.
+    system.extraDependencies = [ inputs.calamares.outPath ];
     environment.etc."calamares-nixos/settings.json".text = settings "latest";
     # Store path lists of the prebuilt reference systems and applications, read
     # by the installer to warm the page cache for the current selection.

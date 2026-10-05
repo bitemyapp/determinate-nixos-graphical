@@ -1,8 +1,8 @@
 # Resolve the catalog against maintained, locked application sources.
-{ inputs, calamares }:
+{ inputs }:
 let
   system = "x86_64-linux";
-  catalog = builtins.fromJSON (builtins.readFile "${calamares.src}/src/applications.json");
+  catalog = builtins.fromJSON (builtins.readFile "${inputs.calamares}/rust/src/applications.json");
   specialArgs = {
     applicationPkgs = import inputs.applications {
       inherit system;
@@ -16,7 +16,7 @@ let
     inputs.nixpkgs.lib.nixosSystem {
       inherit system specialArgs;
       modules = [
-        "${calamares.src}/src/applications.nix"
+        inputs.calamares.nixosModules.applications
         {
           calamares.applications = ids;
           calamares.installUser = "catalog-test";

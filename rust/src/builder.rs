@@ -543,9 +543,10 @@ fn check_configurations(kind: &str, expected: usize, jobs: usize) -> Result<()> 
             name.bytes().all(|c| c.is_ascii_lowercase() || c == b'-'),
             "Invalid configuration case name"
         );
-        // The test expressions import the installer's static modules.
+        // The test expressions supply the modules from the `calamares` input
+        // and their own filesystems in place of hardware detection.
         let source = source.replace(
-            "imports = [ ./hardware-configuration.nix ./applications.nix ./calamares ];",
+            "imports = [ ./hardware-configuration.nix ];",
             "",
         );
         let mut file = File::create(modules.join(format!("{name}.nix")))?;

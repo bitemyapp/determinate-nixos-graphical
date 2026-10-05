@@ -137,6 +137,27 @@
         "type": "github"
       }
     },
+    "calamares": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791202597,
+        "narHash": "sha256-AScLTt/nmAiEIwFzVbDMEtW6/sYz8Fi05UEG2rirDDo=",
+        "owner": "bitemyapp",
+        "repo": "calamares",
+        "rev": "3e9932717680b5eb4ba42f5b92e4df4a8a17b705",
+        "type": "github"
+      },
+      "original": {
+        "owner": "bitemyapp",
+        "ref": "stable",
+        "repo": "calamares",
+        "type": "github"
+      }
+    },
     "crane": {
       "locked": {
         "lastModified": 1758758545,
@@ -579,6 +600,7 @@
       "inputs": {
         "ai-apps": "ai-apps",
         "applications": "applications",
+        "calamares": "calamares",
         "determinate": "determinate",
         "fh": "fh",
         "nixpkgs": "nixpkgs_5",

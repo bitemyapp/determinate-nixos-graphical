@@ -20,8 +20,8 @@ let
     };
     modules = [
       flake.inputs.determinate.nixosModules.default
-      "${flake.packages.x86_64-linux.calamares.src}/src/applications.nix"
-      "${flake.packages.x86_64-linux.calamares.root}/rust/system"
+      # The modules installed systems import from their `calamares` input.
+      flake.inputs.calamares.nixosModules.default
       module
       {
         fileSystems."/" = {

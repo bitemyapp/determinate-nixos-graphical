@@ -1,12 +1,16 @@
-{ pkgs }:
+# The installer package, built from the locked `calamares` flake input.
+{ pkgs, source }:
 let
   pin = builtins.fromJSON (builtins.readFile ./calamares-source.json);
-  # Development builds only: `RESPIN_CALAMARES_SRC=/abs/checkout nix build --impure`.
-  # Pure evaluation always sees an empty value and uses the pinned revision.
+  # Development builds only: `RESPIN_CALAMARES_SRC=/abs/checkout nix build --impure`
+  # builds the installer from a local checkout. Installed systems, reference
+  # systems and tests still use the locked input's modules.
   local = builtins.getEnv "RESPIN_CALAMARES_SRC";
-  source =
+  installerSource =
     if local == "" then
-      pkgs.fetchFromGitHub pin
+      # Tools and the flasher read calamares-source.json; it must name the lock.
+      assert source.rev == pin.rev && source.narHash == pin.hash;
+      source
     else
       builtins.path {
         path = local;
@@ -20,9 +24,4 @@ let
           ]);
       };
 in
-(import "${source}/nix/package.nix" { inherit pkgs; }).overrideAttrs (old: {
-  # Lets checks and the ISO evaluate the same static NixOS modules.
-  passthru = (old.passthru or { }) // {
-    root = source;
-  };
-})
+import "${installerSource}/nix/package.nix" { inherit pkgs; }

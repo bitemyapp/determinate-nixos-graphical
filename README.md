@@ -127,10 +127,13 @@ provide the optional application catalog:
 | Application Nixpkgs | `a7868a727837f3c09cee2ce0ca671c76b1589fed` (nixos-unstable) |
 | AI applications | Numtide llm-agents.nix, `372f0337e8170e55ff0c017cd43ab73b02a062ad` |
 | oh-my-pi | Upstream release v18.6.1, `2a2c6dcbbb558c0f8145f67f28b3370984f2bf60` |
-| Rust installer | Exact Git revision and content hash in [nix/calamares-source.json](nix/calamares-source.json) |
+| Rust installer and installed-system modules | Flake input `calamares` (`github:bitemyapp/calamares/stable`), locked to the revision in [nix/calamares-source.json](nix/calamares-source.json) |
 
-The installer is fetched separately from the installed system's six inputs.
-It writes the hostname-keyed flake, copies the lock verbatim, and generates
+The installed system's flake has the same seven inputs and reuses this lock
+verbatim, so it starts from exactly the tested revisions. Its desktop, swap,
+tuning, Hyprland, Omarchy and application modules come from the `calamares`
+input, not from copies in `/etc/nixos`. The installer writes the
+hostname-keyed flake and lock and generates
 hardware configuration with the normal NixOS tool (without filesystems, which it
 declares itself by identities chosen before formatting). It builds that exact
 system before confirmation, copies it with `nix copy`, and installs the
@@ -345,8 +348,29 @@ local crate. Cargo still reuses unchanged dependencies.
 The installed configuration is in `/etc/nixos/`. Rebuild with
 `sudo nixos-rebuild switch --flake /etc/nixos#YOUR-HOSTNAME`.
 A hostname change does not automatically rename the flake output.
-Update inputs deliberately with `sudo nix flake update` from `/etc/nixos`;
-do not change `system.stateVersion` merely to upgrade packages.
+Do not change `system.stateVersion` merely to upgrade packages.
+
+Installer fixes reach installed systems without a reinstall. The `calamares`
+input follows the installer's `stable` branch, which moves only to revisions
+verified in a complete image:
+
+```sh
+sudo nix flake update calamares --flake /etc/nixos   # installer modules only
+sudo nix flake update --flake /etc/nixos             # or everything
+sudo nixos-rebuild boot --flake /etc/nixos           # then reboot
+```
+
+Systems installed before October 2026 carry module copies under
+`/etc/nixos/calamares`. The installer's
+[RUST-INSTALLER.md](https://github.com/bitemyapp/calamares/blob/stable/RUST-INSTALLER.md#updating-installed-systems)
+shows the one-time conversion.
+
+Branches: `stable` is what installed systems and release images use. The
+default branches (`codex/graphical-installer` here, `calamares` in the
+installer repository) carry reviewed, merged work ahead of it. To pin a new
+installer revision for an image, use
+`respin-tools pin-calamares REVISION`. It updates `nix/calamares-source.json`
+and the lock together, and `nix flake check` verifies that they agree.
 
 The password hash is in `/etc/nixos-secrets/user-password.hash` (root-only),
 referenced by `hashedPasswordFile`. Update/remove that declarative setting

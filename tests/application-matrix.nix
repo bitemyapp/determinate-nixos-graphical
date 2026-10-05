@@ -6,10 +6,7 @@
 let
   repo = toString ../.;
   flake = builtins.getFlake ("git+file://" + repo);
-  library = import ../nix/applications.nix {
-    inputs = flake.inputs;
-    calamares = flake.packages.x86_64-linux.calamares;
-  };
+  library = import ../nix/applications.nix { inputs = flake.inputs; };
   lib = flake.inputs.nixpkgs.lib;
   requested =
     if caseName == "all" then
@@ -28,8 +25,8 @@ let
     inherit (library) specialArgs;
     modules = [
       flake.inputs.determinate.nixosModules.default
-      "${flake.packages.x86_64-linux.calamares.src}/src/applications.nix"
-      "${flake.packages.x86_64-linux.calamares.root}/rust/system"
+      # The modules installed systems import from their `calamares` input.
+      flake.inputs.calamares.nixosModules.default
       (builtins.toPath (repo + "/.work/application-modules/" + caseName + ".nix"))
       {
         fileSystems."/" = {

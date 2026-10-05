@@ -2,6 +2,7 @@ pub mod builder;
 pub mod config;
 pub mod gui_input;
 pub mod live_test;
+pub mod pin;
 pub mod support;
 pub mod vm;
 pub mod wifi_test;
@@ -22,6 +23,7 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
             "boot-installed" => "RUN-NAME",
             "check-config" => "template|settings FILE FILE",
             "check-selections" => "(inside the /workspace build environment)",
+            "pin-calamares" => "REVISION",
             _ => "(run only inside the disposable guest)",
         };
         println!("Usage: {command} {usage}");
@@ -46,6 +48,7 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
         "guest-exec" => vm::guest_exec(args),
         "boot-installed" => vm::boot_installed(args),
         "check-config" => config::main(args),
+        "pin-calamares" => pin::main(args),
         "check-selections" => {
             anyhow::ensure!(args.is_empty(), "Usage: check-selections");
             builder::check_selections()

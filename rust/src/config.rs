@@ -26,6 +26,17 @@ fn settings(text: &str, kernel: &str) -> Result<()> {
     Ok(())
 }
 
+/// Inputs of the installed flake, which reuses this repository's lock.
+const TARGET_INPUTS: [&str; 7] = [
+    "nixpkgs",
+    "determinate",
+    "fh",
+    "applications",
+    "ai-apps",
+    "omp",
+    "calamares",
+];
+
 fn template(source: &str, lock: &str) -> Result<()> {
     ensure!(
         source.matches("@HOSTNAME@").count() == 1,
@@ -41,24 +52,10 @@ fn template(source: &str, lock: &str) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Missing inputs"))?;
     ensure!(
         inputs.keys().map(String::as_str).collect::<BTreeSet<_>>()
-            == BTreeSet::from([
-                "nixpkgs",
-                "determinate",
-                "fh",
-                "applications",
-                "ai-apps",
-                "omp"
-            ]),
+            == BTreeSet::from(TARGET_INPUTS),
         "Unexpected target inputs"
     );
-    for name in [
-        "nixpkgs",
-        "determinate",
-        "fh",
-        "applications",
-        "ai-apps",
-        "omp",
-    ] {
+    for name in TARGET_INPUTS {
         let node = inputs[name]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Expected direct locked input"))?;

@@ -9,6 +9,13 @@
   inputs.applications.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.ai-apps.url = "github:numtide/llm-agents.nix";
   inputs.omp.url = "github:can1357/oh-my-pi/v18.6.1";
+  # The installer and the installed systems' modules. Installed systems track
+  # the same input, so `nix flake update calamares` brings them fixes; the
+  # lock pins the revision this image was built and tested with.
+  inputs.calamares = {
+    url = "github:bitemyapp/calamares/stable";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
 
   outputs =
     inputs@{
@@ -22,8 +29,11 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       tools = import ./nix/tools.nix { inherit pkgs; };
-      calamares = import ./nix/calamares.nix { inherit pkgs; };
-      applicationCatalog = import ./nix/applications.nix { inherit inputs calamares; };
+      calamares = import ./nix/calamares.nix {
+        inherit pkgs;
+        source = inputs.calamares;
+      };
+      applicationCatalog = import ./nix/applications.nix { inherit inputs; };
       installer = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
@@ -125,6 +135,14 @@
               }) liveConfigs
             )
           );
+        # Tools and the flasher read the revision from calamares-source.json.
+        calamares-pin =
+          let
+            pin = builtins.fromJSON (builtins.readFile ./nix/calamares-source.json);
+          in
+          assert inputs.calamares.rev == pin.rev;
+          assert inputs.calamares.narHash == pin.hash;
+          pkgs.writeText "calamares-pin.json" (builtins.toJSON pin);
         template-lock = pkgs.runCommand "template-lock-tests" { } ''
           ${tools}/bin/respin-tools check-config template ${./templates/flake.nix.in} ${./flake.lock}
           touch $out
