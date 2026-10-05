@@ -5,18 +5,32 @@ An unofficial, x86_64 NixOS live ISO with KDE Plasma, Determinate Nix and a
 It uses the official NixOS graphical base, but **not** the upstream C++/Python
 Calamares engine. It is not endorsed by NixOS, Calamares or Determinate Systems.
 
-![Desktop selection and Wi-Fi transfer in the native Rust installer](docs/images/desktop-selector.png)
+![The native Rust installer's welcome page in the live session](docs/images/candidate-welcome.png)
 
 ## Supported workflow
 
 The native installer supports guided **whole-disk erase**, GPT with ext4
 (default), Btrfs or XFS, UEFI with systemd-boot or legacy BIOS with GRUB. The default live desktop is Plasma, while the
 installer lets you select **one or more** of Plasma, GNOME, Xfce, Cinnamon,
-MATE and LXQt and choose the default login session. Plasma is preselected.
+MATE, LXQt, **vanilla Hyprland** and an **Omarchy-style Hyprland**, and choose
+the default login session. Plasma is preselected.
 GNOME and Cinnamon cannot be combined in this pinned NixOS version because
 their modules conflict on GSettings; the UI explains and validates this limit.
 You choose the hostname, normal user, password, full name, timezone, one of
 eight locales/keyboards, and whether to allow unfree packages (enabled by default).
+
+Two further choices are on by default and can be switched off on the Disk page:
+a **swap partition matched to installed RAM with zswap** (also used for
+hibernation), and **CachyOS-inspired tuning** of the kernel, memory, I/O
+schedulers and services. Neither needs a custom kernel or rebuilt packages. See
+[RAM-sized swap and tuning](docs/tuning.md).
+
+The installed system is **prepared before you confirm**. While you review, the
+helper evaluates and builds the complete system in RAM and caches its files.
+The media contain a prebuilt system for every desktop, so this normally
+downloads almost nothing. After you type the erase confirmation, installation
+only partitions, formats, copies and installs the bootloader. See
+[Fast installation](docs/fast-install.md) for the design and measurements.
 
 Both the live image and installed system include redistributable device firmware,
 which can be proprietary. The live image also enables both Intel and AMD CPU
@@ -95,9 +109,11 @@ provide the optional application catalog:
 | Rust installer | Exact Git revision and content hash in [nix/calamares-source.json](nix/calamares-source.json) |
 
 The installer is fetched separately from the installed system's six inputs.
-It writes the hostname-keyed flake, copies the lock
-verbatim, generates hardware configuration with the normal NixOS tool, and calls
-`nixos-install --flake` explicitly. There is no Python patch, PyO3 bridge,
+It writes the hostname-keyed flake, copies the lock verbatim, and generates
+hardware configuration with the normal NixOS tool (without filesystems, which it
+declares itself by identities chosen before formatting). It builds that exact
+system before confirmation, copies it with `nix copy`, and installs the
+bootloader with `nixos-install --system`. There is no Python patch, PyO3 bridge,
 Calamares global-storage hook, Perl flake override or duplicate INI defaults.
 
 One root-owned JSON file configures the live installer. The GUI is unprivileged;

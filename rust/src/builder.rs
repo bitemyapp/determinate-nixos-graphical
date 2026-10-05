@@ -507,7 +507,8 @@ fn export_wifi_tools() -> Result<()> {
 }
 
 pub fn check_selections() -> Result<()> {
-    check_configurations("desktop", 47, 4)?;
+    // Nonempty subsets of eight desktops, less those with both GNOME and Cinnamon.
+    check_configurations("desktop", 255 - 64, 8)?;
     check_configurations("application", 34, 1)
 }
 
@@ -520,10 +521,13 @@ fn check_configurations(kind: &str, expected: usize, jobs: usize) -> Result<()> 
         rev.len() == 40 && rev.bytes().all(|c| c.is_ascii_hexdigit()),
         "Invalid revision"
     );
-    let fixture = repo
-        .join(".work/native-fixture")
-        .join(rev)
-        .join("bin/calamares-vm-fixture");
+    let fixture = std::env::var_os("RESPIN_FIXTURE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            repo.join(".work/native-fixture")
+                .join(rev)
+                .join("bin/calamares-vm-fixture")
+        });
     let configurations = output(Command::new(fixture).arg(format!("{kind}-configurations")))?;
     let cases: std::collections::BTreeMap<String, String> = serde_json::from_str(&configurations)?;
     ensure!(
@@ -539,8 +543,9 @@ fn check_configurations(kind: &str, expected: usize, jobs: usize) -> Result<()> 
             name.bytes().all(|c| c.is_ascii_lowercase() || c == b'-'),
             "Invalid configuration case name"
         );
+        // The test expressions import the installer's static modules.
         let source = source.replace(
-            "imports = [ ./hardware-configuration.nix ./applications.nix ];",
+            "imports = [ ./hardware-configuration.nix ./applications.nix ./calamares ];",
             "",
         );
         let mut file = File::create(modules.join(format!("{name}.nix")))?;

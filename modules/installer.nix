@@ -11,6 +11,10 @@ let
   calamares = import ../nix/calamares.nix { inherit pkgs; };
   diagnostics = import ../nix/live-diagnostics.nix { inherit pkgs; };
   applicationCatalog = import ../nix/applications.nix { inherit inputs calamares; };
+  references = import ../nix/reference-systems.nix {
+    inherit inputs calamares applicationCatalog;
+    desktops = config.respin.referenceDesktops;
+  };
   settings =
     kernel:
     builtins.toJSON {
@@ -22,150 +26,193 @@ let
     };
 in
 {
-  services.desktopManager.plasma6 = {
-    enable = true;
-    enableQt5Integration = false;
+  options.respin = {
+    referenceDesktops = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "plasma"
+        "gnome"
+        "xfce"
+        "cinnamon"
+        "mate"
+        "lxqt"
+        "hyprland"
+        "omarchy"
+      ];
+      description = "Desktops whose complete installed systems are prebuilt on the media.";
+    };
+    cacheApplications = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Store every optional application on the media. Development images may omit it.";
+    };
   };
-  services.displayManager = {
-    plasma-login-manager.enable = true;
-    autoLogin = {
+  config = {
+    services.desktopManager.plasma6 = {
       enable = true;
-      user = "nixos";
+      enableQt5Integration = false;
     };
-  };
-  environment.plasma6.excludePackages = [ pkgs.kdePackages.plasma-workspace-wallpapers ];
-  programs.kde-pim.enable = false;
-  environment.systemPackages = [
-    inputs.fh.packages.${pkgs.stdenv.hostPlatform.system}.default
-    calamares
-    diagnostics
-    # Small interactive diagnostics, also used to prove real GUI event delivery
-    # in our disposable VM tests (not merely successful QMP commands).
-    pkgs.xev
-    pkgs.xwininfo
-    (pkgs.makeAutostartItem {
-      name = "org.calamares.NixOSRust";
-      package = calamares;
-    })
-  ];
-  # No blanket wheel grant from the graphical base. Only the local active live
-  # user may start this exact helper without a password. Keep live networking
-  # usable too: mkForce replaces NetworkManager's normal group-based rule.
-  security.polkit.enable = true;
-  security.polkit.enablePkexecWrapper = true;
-  security.polkit.extraConfig = lib.mkForce ''
-    polkit.addRule(function(action, subject) {
-      if (action.id == "org.calamares.nixos.install" &&
-          subject.user == "nixos" && subject.local && subject.active) {
-        return polkit.Result.YES;
-      }
-      if (action.id.indexOf("org.freedesktop.NetworkManager.") == 0 &&
-          subject.user == "nixos" && subject.local && subject.active &&
-          subject.isInGroup("networkmanager")) {
-        return polkit.Result.YES;
-      }
-    });
-  '';
-  # NetworkManager enables wpa_supplicant in D-Bus-controlled mode. Forcing
-  # wireless.enable off removes that backend, leaving even working radios
-  # unavailable. Do not run a separate, competing wireless manager.
-  networking.networkmanager.enable = true;
-  networking.networkmanager.wifi.backend = "wpa_supplicant";
-  hardware.enableRedistributableFirmware = true;
-  # Universal media can carry both bundles; early boot applies only the update
-  # matching the CPU. Installed systems use upstream vendor detection.
-  hardware.cpu.intel.updateMicrocode = true;
-  hardware.cpu.amd.updateMicrocode = true;
-  nixpkgs.config.allowUnfree = true;
-  services.libinput.enable = true;
-
-  # Recent laptops need recent DRM, I2C and HID support. Keep the version pinned
-  # by our existing lock; the older kernel is an explicitly named fallback.
-  boot.kernelPackages = pkgs.linuxPackages_latest;
-  boot.supportedFilesystems = {
-    ext4 = true;
-    btrfs = true;
-    xfs = true;
-    vfat = true;
-    zfs = lib.mkForce false;
-  };
-  # Keep boot progress and the text-console recovery route visible.
-  boot.plymouth.enable = lib.mkForce false;
-
-  # The native backend writes the target flake and explicitly selects it.
-  # No Python patch, global-storage bridge or nixos-generate-config override.
-  environment.etc."calamares-nixos/flake.nix.in".source = ../templates/flake.nix.in;
-  environment.etc."calamares-nixos/flake.lock".source = ../flake.lock;
-  environment.etc."calamares-nixos/settings.json".text = settings "latest";
-  systemd.tmpfiles.settings."10-installer-desktop" = {
-    "/home/nixos/Desktop".d = {
-      user = "nixos";
-      group = "users";
-      mode = "0755";
+    services.displayManager = {
+      plasma-login-manager.enable = true;
+      autoLogin = {
+        enable = true;
+        user = "nixos";
+      };
     };
-    "/home/nixos/Desktop/nixos-manual.desktop"."L+".argument =
-      "/run/current-system/sw/share/applications/nixos-manual.desktop";
-    "/home/nixos/Desktop/gparted.desktop"."L+".argument =
-      "${pkgs.gparted}/share/applications/gparted.desktop";
-    "/home/nixos/Desktop/org.calamares.NixOSRust.desktop"."L+".argument =
-      "${calamares}/share/applications/org.calamares.NixOSRust.desktop";
-  };
-
-  isoImage.edition = lib.mkForce "plasma-determinate-rust";
-  isoImage.volumeID = "nixos-determinate-x86_64";
-  image.baseName = lib.mkForce "nixos-graphical-determinate-rust-${config.system.nixos.label}-x86_64-linux";
-  # Put the distinguishing information FIRST. The upstream menu appends the
-  # distro/revision; our old long branding hid kernel versions on small screens.
-  isoImage.prependToMenuLabel = "${config.boot.kernelPackages.kernel.version} Plasma (default) | ";
-  isoImage.appendToMenuLabel = lib.mkForce "";
-  isoImage.configurationName = lib.mkForce null;
-  specialisation.lts_kernel.configuration =
-    {
-      config,
-      lib,
-      pkgs,
-      ...
-    }:
-    {
-      boot.kernelPackages = lib.mkForce pkgs.linuxPackages;
-      isoImage.prependToMenuLabel = lib.mkForce "${config.boot.kernelPackages.kernel.version} Plasma (LTS) | ";
-      environment.etc."calamares-nixos/settings.json".text = lib.mkForce (settings "lts");
-    };
-  specialisation.compatibility.configuration = { config, lib, ... }: {
-    isoImage.prependToMenuLabel = lib.mkForce "${config.boot.kernelPackages.kernel.version} Xfce/X11 (software) | ";
-    services.desktopManager.plasma6.enable = lib.mkForce false;
-    services.displayManager.plasma-login-manager.enable = lib.mkForce false;
-    services.xserver.displayManager.lightdm.enable = true;
-    services.xserver.desktopManager.xfce = {
+    environment.plasma6.excludePackages = [ pkgs.kdePackages.plasma-workspace-wallpapers ];
+    programs.kde-pim.enable = false;
+    environment.systemPackages = [
+      inputs.fh.packages.${pkgs.stdenv.hostPlatform.system}.default
+      calamares
+      diagnostics
+      # Small interactive diagnostics, also used to prove real GUI event delivery
+      # in our disposable VM tests (not merely successful QMP commands).
+      pkgs.xev
+      pkgs.xwininfo
+      (pkgs.makeAutostartItem {
+        name = "org.calamares.NixOSRust";
+        package = calamares;
+      })
+    ];
+    # No blanket wheel grant from the graphical base. Only the local active live
+    # user may start this exact helper without a password. Keep live networking
+    # usable too: mkForce replaces NetworkManager's normal group-based rule.
+    security.polkit.enable = true;
+    security.polkit.enablePkexecWrapper = true;
+    security.polkit.extraConfig = lib.mkForce ''
+      polkit.addRule(function(action, subject) {
+        if (action.id == "org.calamares.nixos.install" &&
+            subject.user == "nixos" && subject.local && subject.active) {
+          return polkit.Result.YES;
+        }
+        if (action.id.indexOf("org.freedesktop.NetworkManager.") == 0 &&
+            subject.user == "nixos" && subject.local && subject.active &&
+            subject.isInGroup("networkmanager")) {
+          return polkit.Result.YES;
+        }
+      });
+    '';
+    # NetworkManager enables wpa_supplicant in D-Bus-controlled mode. Forcing
+    # wireless.enable off removes that backend, leaving even working radios
+    # unavailable. Do not run a separate, competing wireless manager.
+    networking.networkmanager.enable = true;
+    networking.networkmanager.wifi.backend = "wpa_supplicant";
+    hardware.enableRedistributableFirmware = true;
+    # Universal media can carry both bundles; early boot applies only the update
+    # matching the CPU. Installed systems use upstream vendor detection.
+    hardware.cpu.intel.updateMicrocode = true;
+    hardware.cpu.amd.updateMicrocode = true;
+    nixpkgs.config.allowUnfree = true;
+    services.libinput.enable = true;
+    # Compressed RAM swap for the live session, with CachyOS's zram values.
+    # Evaluating a desktop system needs a few GiB, and the live store itself
+    # is RAM (tmpfs pages are swappable): this keeps machines with 6-8 GiB from
+    # running out of memory before installation. Installed systems instead get
+    # a RAM-sized swap partition with zswap.
+    zramSwap = {
       enable = true;
-      enableScreensaver = false;
+      algorithm = "zstd";
+      memoryPercent = 100;
     };
-    services.displayManager.defaultSession = lib.mkForce "xfce";
-    environment.sessionVariables = {
-      LIBGL_ALWAYS_SOFTWARE = "1";
-      GSK_RENDERER = "cairo";
+    boot.kernel.sysctl = {
+      "vm.swappiness" = 150;
+      "vm.page-cluster" = 0;
     };
-    # Retain native kernel modesetting: nomodeset is a separate upstream boot
-    # menu option, not a blanket workaround for all graphics hardware.
-    services.xserver.deviceSection = ''
-      Option "AccelMethod" "none"
-      Option "SWcursor" "true"
-    '';
-    environment.etc."xdg/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml".text = ''
-      <?xml version="1.0" encoding="UTF-8"?>
-      <channel name="xfwm4" version="1.0">
-        <property name="general" type="empty">
-          <property name="use_compositing" type="bool" value="false"/>
-        </property>
-      </channel>
-    '';
+
+    # Recent laptops need recent DRM, I2C and HID support. Keep the version pinned
+    # by our existing lock; the older kernel is an explicitly named fallback.
+    boot.kernelPackages = pkgs.linuxPackages_latest;
+    boot.supportedFilesystems = {
+      ext4 = true;
+      btrfs = true;
+      xfs = true;
+      vfat = true;
+      zfs = lib.mkForce false;
+    };
+    # Keep boot progress and the text-console recovery route visible.
+    boot.plymouth.enable = lib.mkForce false;
+
+    # The native backend writes the target flake and explicitly selects it.
+    # No Python patch, global-storage bridge or nixos-generate-config override.
+    environment.etc."calamares-nixos/flake.nix.in".source = ../templates/flake.nix.in;
+    environment.etc."calamares-nixos/flake.lock".source = ../flake.lock;
+    environment.etc."calamares-nixos/settings.json".text = settings "latest";
+    # Store path lists of the prebuilt reference systems and applications, read
+    # by the installer to warm the page cache for the current selection.
+    isoImage.contents = references.lists;
+    systemd.tmpfiles.settings."10-installer-desktop" = {
+      "/home/nixos/Desktop".d = {
+        user = "nixos";
+        group = "users";
+        mode = "0755";
+      };
+      "/home/nixos/Desktop/nixos-manual.desktop"."L+".argument =
+        "/run/current-system/sw/share/applications/nixos-manual.desktop";
+      "/home/nixos/Desktop/gparted.desktop"."L+".argument =
+        "${pkgs.gparted}/share/applications/gparted.desktop";
+      "/home/nixos/Desktop/org.calamares.NixOSRust.desktop"."L+".argument =
+        "${calamares}/share/applications/org.calamares.NixOSRust.desktop";
+    };
+
+    isoImage.edition = lib.mkForce "plasma-determinate-rust";
+    isoImage.volumeID = "nixos-determinate-x86_64";
+    image.baseName = lib.mkForce "nixos-graphical-determinate-rust-${config.system.nixos.label}-x86_64-linux";
+    # Put the distinguishing information FIRST. The upstream menu appends the
+    # distro/revision; our old long branding hid kernel versions on small screens.
+    isoImage.prependToMenuLabel = "${config.boot.kernelPackages.kernel.version} Plasma (default) | ";
+    isoImage.appendToMenuLabel = lib.mkForce "";
+    isoImage.configurationName = lib.mkForce null;
+    specialisation.lts_kernel.configuration =
+      {
+        config,
+        lib,
+        pkgs,
+        ...
+      }:
+      {
+        boot.kernelPackages = lib.mkForce pkgs.linuxPackages;
+        isoImage.prependToMenuLabel = lib.mkForce "${config.boot.kernelPackages.kernel.version} Plasma (LTS) | ";
+        environment.etc."calamares-nixos/settings.json".text = lib.mkForce (settings "lts");
+      };
+    specialisation.compatibility.configuration = { config, lib, ... }: {
+      isoImage.prependToMenuLabel = lib.mkForce "${config.boot.kernelPackages.kernel.version} Xfce/X11 (software) | ";
+      services.desktopManager.plasma6.enable = lib.mkForce false;
+      services.displayManager.plasma-login-manager.enable = lib.mkForce false;
+      services.xserver.displayManager.lightdm.enable = true;
+      services.xserver.desktopManager.xfce = {
+        enable = true;
+        enableScreensaver = false;
+      };
+      services.displayManager.defaultSession = lib.mkForce "xfce";
+      environment.sessionVariables = {
+        LIBGL_ALWAYS_SOFTWARE = "1";
+        GSK_RENDERER = "cairo";
+      };
+      # Retain native kernel modesetting: nomodeset is a separate upstream boot
+      # menu option, not a blanket workaround for all graphics hardware.
+      services.xserver.deviceSection = ''
+        Option "AccelMethod" "none"
+        Option "SWcursor" "true"
+      '';
+      environment.etc."xdg/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml".text = ''
+        <?xml version="1.0" encoding="UTF-8"?>
+        <channel name="xfwm4" version="1.0">
+          <property name="general" type="empty">
+            <property name="use_compositing" type="bool" value="false"/>
+          </property>
+        </channel>
+      '';
+    };
+    isoImage.squashfsCompression = "zstd -Xcompression-level 6";
+    # Keep optional packages and a prebuilt installed system for every desktop
+    # in the read-only store, without adding them to the live session. An
+    # installation then copies from the media instead of downloading into RAM.
+    isoImage.storeContents =
+      lib.optional config.respin.cacheApplications applicationCatalog.cache ++ references.toplevels;
+    boot.kernelParams = [
+      "console=ttyS0,115200n8"
+      "console=tty0"
+    ];
+
   };
-  isoImage.squashfsCompression = "zstd -Xcompression-level 6";
-  # Keep optional packages in the read-only store, without adding them to the
-  # live session. Preflight can realize any selection without filling live RAM.
-  isoImage.storeContents = [ applicationCatalog.cache ];
-  boot.kernelParams = [
-    "console=ttyS0,115200n8"
-    "console=tty0"
-  ];
 }

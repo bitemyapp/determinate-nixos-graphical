@@ -44,7 +44,12 @@ let
       ) app.packages;
 in
 {
-  inherit catalog specialArgs evaluate;
+  inherit
+    catalog
+    specialArgs
+    evaluate
+    packageList
+    ;
   cache = all.config.system.build.installerApplications;
   # The generated per-choice matrix runs in separate evaluator processes.
   # Retaining all those complete NixOS systems here exhausts small builders.

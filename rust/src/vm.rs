@@ -176,6 +176,24 @@ impl Vm {
             );
         }
         let accelerator = acceleration()?;
+        let number = |name: &str, default: &str| -> Result<String> {
+            let value = std::env::var(name).unwrap_or_else(|_| default.into());
+            ensure!(
+                !value.is_empty() && value.len() <= 12 && value.bytes().all(|c| c.is_ascii_digit()),
+                "{name} must be a number"
+            );
+            Ok(value)
+        };
+        // Defaults keep earlier results comparable; timing runs can model a laptop.
+        let memory = number("RESPIN_QEMU_MEMORY", "8192")?;
+        let cpus = number("RESPIN_QEMU_CPUS", "4")?;
+        // Optional read limit modelling a USB stick, in bytes per second.
+        let usb = std::env::var("RESPIN_USB_BPS")
+            .ok()
+            .map(|_| number("RESPIN_USB_BPS", "0"))
+            .transpose()?
+            .map(|bps| format!(",throttling.bps-read={bps}"))
+            .unwrap_or_default();
         let machine = format!(
             "q35,vmport=off,i8042={}",
             if input == InputDevices::Usb {
@@ -204,9 +222,9 @@ impl Vm {
                 "-cpu",
                 if accelerator == "kvm" { "host" } else { "max" },
                 "-smp",
-                "4",
+                &cpus,
                 "-m",
-                "8192",
+                &memory,
                 "-display",
                 "none",
                 "-vga",
@@ -245,6 +263,9 @@ impl Vm {
             let vars = work.join("OVMF_VARS.fd");
             if !vars.exists() {
                 fs::copy(source, &vars)?;
+                // Firmware from the Nix store is read-only; UEFI variables are not.
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&vars, fs::Permissions::from_mode(0o644))?;
             }
             command
                 .arg("-drive")
@@ -271,7 +292,7 @@ impl Vm {
             command
                 .arg("-drive")
                 .arg(format!(
-                    "if=none,id=iso,format=raw,readonly=on,file={}",
+                    "if=none,id=iso,format=raw,readonly=on,file={}{usb}",
                     qpath(iso)?
                 ))
                 .args(["-device", "usb-storage,drive=iso,bootindex=1"]);
@@ -405,6 +426,13 @@ impl Drop for Vm {
 }
 
 pub(crate) fn fixture(repo: &Path) -> Result<String> {
+    // Development runs: a static fixture built from a local installer checkout.
+    if let Some(local) = std::env::var_os("RESPIN_FIXTURE") {
+        let dir = repo.join(".work/native-fixture/local/bin");
+        fs::create_dir_all(&dir)?;
+        fs::copy(regular(Path::new(&local))?, dir.join("calamares-vm-fixture"))?;
+        return Ok("/workspace/.work/native-fixture/local/bin/calamares-vm-fixture".into());
+    }
     let pin: Value = serde_json::from_slice(&fs::read(repo.join("nix/calamares-source.json"))?)?;
     let revision = pin["rev"].as_str().context("Missing installer revision")?;
     ensure!(
@@ -432,6 +460,56 @@ pub(crate) fn fixture(repo: &Path) -> Result<String> {
     Ok(format!(
         "/workspace/.work/native-fixture/{revision}/bin/calamares-vm-fixture"
     ))
+}
+
+/// Optional fixture choices passed through from the host environment.
+fn fixture_options() -> Result<String> {
+    let mut options = String::new();
+    for name in [
+        "CALAMARES_TEST_DESKTOPS",
+        "CALAMARES_TEST_SWAP",
+        "CALAMARES_TEST_TUNING",
+        "CALAMARES_TEST_SESSION",
+    ] {
+        if let Ok(value) = std::env::var(name) {
+            ensure!(
+                value.len() < 256
+                    && value
+                        .bytes()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b',' || c == b'-'),
+                "Invalid {name}"
+            );
+            options.push_str(&format!("{name}={value} "));
+        }
+    }
+    Ok(options)
+}
+
+/// Stage durations reported by the helper and the fixture's click-to-complete time.
+fn timing(log: &str) -> Value {
+    let mut stages = serde_json::Map::new();
+    let mut result = json!({});
+    for line in log.lines() {
+        if let Ok(event) = serde_json::from_str::<Value>(line)
+            && event["kind"] == "timing"
+            && let (Some(stage), Some(seconds)) = (event["stage"].as_str(), event["seconds"].as_f64())
+        {
+            stages.insert(stage.into(), json!(seconds));
+        } else if let Ok(event) = serde_json::from_str::<Value>(line)
+            && event["kind"] == "prepared"
+        {
+            result["prepared"] = event["summary"].clone();
+        }
+        for marker in ["PREPARED_SECONDS", "CLICK_TO_COMPLETE_SECONDS"] {
+            if let Some(value) = line.strip_prefix(&format!("{marker}="))
+                && let Ok(seconds) = value.trim().parse::<f64>()
+            {
+                result[marker.to_lowercase()] = json!(seconds);
+            }
+        }
+    }
+    result["stages"] = Value::Object(stages);
+    result
 }
 
 fn verify_installed(
@@ -473,14 +551,20 @@ fn verify_installed(
         crate::gui_input::type_text(&mut qmp, "Qemu-Only-Test-123!")?;
         crate::gui_input::key(&mut qmp, &["ret"])?;
         drop(qmp);
-        let process = if output.lines().any(|line| line == "DESKTOP_SESSION=xfce") {
-            "xfce4-session"
-        } else if output.lines().any(|line| line == "DESKTOP_SESSION=plasma") {
-            "plasmashell"
-        } else {
-            bail!(
-                "GUI login automation supports Plasma or Xfce only; other desktops are evaluated separately"
-            );
+        let session = output
+            .lines()
+            .find_map(|line| line.strip_prefix("DESKTOP_SESSION="))
+            .context("Fixture did not report the default session")?;
+        let process = match session {
+            "plasma" => "plasmashell",
+            "xfce" => "xfce4-session",
+            "gnome" => "gnome-shell",
+            "cinnamon" => "cinnamon-session",
+            "mate" => "mate-session",
+            "lxqt" => "lxqt-session",
+            // Both Hyprland flavors run the same compositor binary.
+            "hyprland" | "omarchy" => "Hyprland",
+            other => bail!("No login check for desktop session {other}"),
         };
         // Session managers can use a bare argv[0], a bin/libexec path, or a
         // Nix wrapper. Match the exact program token, not a hard-coded path.
@@ -642,14 +726,14 @@ pub fn main(args: Vec<String>) -> Result<()> {
                 println!(
                     "GUI ready in {name}. Use tests/qmp_input.rs to complete the installation form. Waiting up to 10 minutes for the native helper."
                 );
-                vm.execute("for i in $(seq 1 600); do pgrep -u 0 -f '^/[^ ]+/bin/[.]?calamares-nixos-helper(-wrapped)? install( |$)' && exit 0; sleep 1; done; exit 1", Duration::from_secs(620))?;
+                vm.execute("for i in $(seq 1 600); do pgrep -u 0 -f '^/[^ ]+/bin/[.]?calamares-nixos-helper(-wrapped)? (install|session)( |$)' && exit 0; sleep 1; done; exit 1", Duration::from_secs(620))?;
                 fs::write(
                     artifacts.join("install.log"),
                     "GUI_INSTALL_HELPER_STARTED\n",
                 )?;
                 // Application preparation and installation each have their own
                 // two-hour deadline. Allow both phases to finish under TCG.
-                vm.execute("while pgrep -u 0 -f '^/[^ ]+/bin/[.]?calamares-nixos-helper(-wrapped)? install( |$)' >/dev/null; do sleep 2; done", Duration::from_secs(15000))?;
+                vm.execute("while pgrep -u 0 -f '^/[^ ]+/bin/[.]?calamares-nixos-helper(-wrapped)? (install|session)( |$)' >/dev/null; do sleep 2; done", Duration::from_secs(15000))?;
                 pause(Duration::from_secs(3))?;
                 vm.screenshot(&artifacts.join("gui-finished.png"))?;
                 // Exit alone is not a pass. Boot/authentication decide below.
@@ -661,12 +745,16 @@ pub fn main(args: Vec<String>) -> Result<()> {
                 // The fixture is shared from the host, never shipped on the ISO.
                 vm.execute(
                     &format!(
-                        "CALAMARES_TEST_FILESYSTEM={} CALAMARES_TEST_PREVIOUS_FILESYSTEM={} CALAMARES_TEST_APPLICATIONS={} {} install > {} 2>&1",
-                        shell_quote(&root_filesystem), shell_quote(&previous_filesystem), shell_quote(&applications), shell_quote(fixture),
+                        "{}CALAMARES_TEST_FILESYSTEM={} CALAMARES_TEST_PREVIOUS_FILESYSTEM={} CALAMARES_TEST_APPLICATIONS={} {} install > {} 2>&1",
+                        fixture_options()?, shell_quote(&root_filesystem), shell_quote(&previous_filesystem), shell_quote(&applications), shell_quote(fixture),
                         shell_quote(&format!("/workspace/artifacts/{name}/install.log"))
                     ),
                     Duration::from_secs(15000),
                 )?;
+            }
+            if let Ok(log) = fs::read_to_string(artifacts.join("install.log")) {
+                result["timing"] = timing(&log);
+                println!("Timing: {}", result["timing"]);
             }
             let live_wifi = vm.execute("nmcli --get-values connection.permissions connection show uuid 135ea3d9-d456-44b1-ae42-1e7081f66666", SHORT)?;
             ensure!(
@@ -813,6 +901,15 @@ pub fn boot_installed(args: Vec<String>) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn timing_collects_helper_stages_and_fixture_markers() {
+        let log = "{\"kind\":\"timing\",\"stage\":\"copy\",\"seconds\":12.5}\n{\"kind\":\"prepared\",\"summary\":{\"closure_bytes\":7}}\nPREPARED_SECONDS=40.0\nCLICK_TO_COMPLETE_SECONDS=31.2\nnoise\n";
+        let value = timing(log);
+        assert_eq!(value["stages"]["copy"], 12.5);
+        assert_eq!(value["prepared"]["closure_bytes"], 7);
+        assert_eq!(value["click_to_complete_seconds"], 31.2);
+        assert_eq!(value["prepared_seconds"], 40.0);
+    }
     #[test]
     fn storage_options_are_closed_and_nvme_sector_size_is_explicit() {
         assert!(DiskBus::parse("sata").is_err());

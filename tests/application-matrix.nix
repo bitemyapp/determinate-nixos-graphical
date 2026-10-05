@@ -29,6 +29,7 @@ let
     modules = [
       flake.inputs.determinate.nixosModules.default
       "${flake.packages.x86_64-linux.calamares.src}/src/applications.nix"
+      "${flake.packages.x86_64-linux.calamares.root}/rust/system"
       (builtins.toPath (repo + "/.work/application-modules/" + caseName + ".nix"))
       {
         fileSystems."/" = {
@@ -56,7 +57,7 @@ assert c.programs.steam.enable == has "steam";
 assert c.virtualisation.docker.rootless.enable == has "docker";
 assert !(builtins.elem "docker" c.users.users.alice.extraGroups);
 assert !has "rustup" || has "build-tools";
-assert c.fileSystems."/".device == "/dev/disk/by-uuid/11111111-2222-3333-4444-555555555555";
+assert c.fileSystems."/".device == "/dev/disk/by-uuid/11111111-2222-4333-8444-555555555555";
 assert c.fileSystems."/boot".device == "/dev/disk/by-uuid/A1B2-C3D4";
 {
   derivation = c.system.build.toplevel.drvPath;
