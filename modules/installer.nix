@@ -105,6 +105,21 @@ in
     # matching the CPU. Installed systems use upstream vendor detection.
     hardware.cpu.intel.updateMicrocode = true;
     hardware.cpu.amd.updateMicrocode = true;
+    # NVIDIA's own driver (latest release, open kernel modules) instead of
+    # nouveau, which can hang hybrid laptops when a program wakes the NVIDIA
+    # GPU. Machines without one simply do not load it. The installed system's
+    # calamares.nvidia module chooses the same package, so installations copy
+    # it from the media: NVIDIA's packages are not in the public binary cache.
+    services.xserver.videoDrivers = [
+      "nvidia"
+      "modesetting"
+      "fbdev"
+    ];
+    hardware.nvidia = {
+      package = config.boot.kernelPackages.nvidiaPackages.latest;
+      open = true;
+      modesetting.enable = true;
+    };
     nixpkgs.config.allowUnfree = true;
     services.libinput.enable = true;
     # Compressed RAM swap for the live session, with CachyOS's zram values.
@@ -190,6 +205,13 @@ in
         enableScreensaver = false;
       };
       services.displayManager.defaultSession = lib.mkForce "xfce";
+      # The fallback uses no GPU driver for NVIDIA GPUs: neither NVIDIA's
+      # nor nouveau.
+      services.xserver.videoDrivers = lib.mkForce [
+        "modesetting"
+        "fbdev"
+      ];
+      boot.blacklistedKernelModules = [ "nouveau" ];
       environment.sessionVariables = {
         LIBGL_ALWAYS_SOFTWARE = "1";
         GSK_RENDERER = "cairo";

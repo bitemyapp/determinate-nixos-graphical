@@ -50,9 +50,15 @@ microcode bundles; installed CPU settings come from upstream hardware detection.
 The installed system permits additional unfree packages
 by default, with an explicit GUI opt-out. Opting out does not remove redistributable
 firmware or make the system strictly free-software-only. Package permission is
-not automatic driver selection: NVIDIA/hybrid graphics and unusual out-of-tree
-drivers still need hardware-specific configuration. The installer preserves
-upstream hardware detection and does not force unrelated vendor drivers on all PCs.
+not automatic driver selection for unusual out-of-tree drivers. The installer
+preserves upstream hardware detection.
+
+NVIDIA GPUs use NVIDIA's own driver (latest release, open kernel modules), never
+nouveau. The live system loads it when the machine has an NVIDIA GPU; the
+"Xfce/X11 (software)" boot entry uses neither driver. The installer configures
+the same driver on installed systems, with PRIME offload and power-down on
+hybrid laptops. Without unfree packages, installed systems keep nouveau. The
+latest driver supports Turing (GeForce 16/RTX 20) and newer GPUs only.
 
 This experimental first release does **not** support manual partitioning,
 preserving another OS, encryption, RAID/LVM, offline installation,

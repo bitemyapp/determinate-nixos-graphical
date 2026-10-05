@@ -144,11 +144,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791202597,
-        "narHash": "sha256-AScLTt/nmAiEIwFzVbDMEtW6/sYz8Fi05UEG2rirDDo=",
+        "lastModified": 1791204025,
+        "narHash": "sha256-MdiENchBrvb1qEzJx6EIBGPqb9O4xtQqL4KCoOA4b8E=",
         "owner": "bitemyapp",
         "repo": "calamares",
-        "rev": "3e9932717680b5eb4ba42f5b92e4df4a8a17b705",
+        "rev": "0cbb39e2c42ab4b0a05690a7727dd69dea051545",
         "type": "github"
       },
       "original": {

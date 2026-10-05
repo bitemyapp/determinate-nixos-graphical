@@ -95,6 +95,20 @@
           assert !recovery.services.desktopManager.plasma6.enable;
           assert !recovery.services.displayManager.plasma-login-manager.enable;
           assert recovery.environment.sessionVariables.LIBGL_ALWAYS_SOFTWARE == "1";
+          # NVIDIA's driver, never nouveau; the fallback uses neither.
+          assert builtins.all
+            (
+              c:
+              builtins.elem "nvidia" c.services.xserver.videoDrivers
+              && builtins.elem "nouveau" c.boot.blacklistedKernelModules
+              && c.hardware.nvidia.open
+            )
+            [
+              normal
+              lts
+            ];
+          assert !(builtins.elem "nvidia" recovery.services.xserver.videoDrivers);
+          assert builtins.elem "nouveau" recovery.boot.blacklistedKernelModules;
           assert
             recovery.environment.etc."calamares-nixos/settings.json".text
             == etc."calamares-nixos/settings.json".text;
@@ -135,6 +149,41 @@
               }) liveConfigs
             )
           );
+        # An installed system with an NVIDIA GPU uses the driver build on the
+        # media, for the latest and LTS kernels alike.
+        nvidia-on-media =
+          let
+            installed =
+              kernel:
+              (nixpkgs.lib.nixosSystem {
+                inherit system;
+                inherit (applicationCatalog) specialArgs;
+                modules = [
+                  determinate.nixosModules.default
+                  (import "${inputs.calamares}/rust/reference.nix" {
+                    desktops = [ "plasma" ];
+                    inherit kernel;
+                  })
+                  {
+                    calamares.nvidia = {
+                      enable = true;
+                      prime = {
+                        nvidiaBusId = "PCI:1:0:0";
+                        intelBusId = "PCI:0:2:0";
+                      };
+                    };
+                  }
+                ];
+              }).config;
+            same =
+              installed: live: installed.hardware.nvidia.package.outPath == live.hardware.nvidia.package.outPath;
+            latest = installed "latest";
+          in
+          assert same latest installer.config;
+          assert same (installed "lts") installer.config.specialisation.lts_kernel.configuration;
+          assert latest.hardware.nvidia.open && latest.hardware.nvidia.prime.offload.enable;
+          assert latest.hardware.nvidia.powerManagement.finegrained;
+          pkgs.writeText "nvidia-on-media" latest.hardware.nvidia.package.version;
         # Tools and the flasher read the revision from calamares-source.json.
         calamares-pin =
           let

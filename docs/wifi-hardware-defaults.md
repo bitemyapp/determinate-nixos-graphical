@@ -47,12 +47,11 @@ authentication. That coverage gap allowed this live-image bug to escape.
 - `hardware.enableAllFirmware` remains false. The normal redistributable bundle
   is enabled; this is not a claim to include every restricted/special-purpose
   firmware package. See the pinned [firmware module](https://github.com/NixOS/nixpkgs/blob/c59305bab2065cfecc4944690d9eedbb56f3a9fa/nixos/modules/hardware/all-firmware.nix).
-- Allowing unfree packages is **not automatic vendor-driver configuration**.
-  NVIDIA/hybrid graphics and unusual out-of-tree drivers still require
-  hardware-specific setup; the installer does not invent GPU bus IDs or force
-  unrelated vendor modules onto every computer. The pinned
-  [NVIDIA module](https://github.com/NixOS/nixpkgs/blob/c59305bab2065cfecc4944690d9eedbb56f3a9fa/nixos/modules/hardware/video/nvidia.nix)
-  has separate configuration requirements.
+- NVIDIA GPUs get NVIDIA's driver (latest release, open kernel modules) on the
+  live system and on installed systems, never nouveau. The installer reads the
+  bus IDs from sysfs and adds PRIME offload on hybrid laptops; see the installer's
+  RUST-INSTALLER.md. Unusual out-of-tree drivers still need hardware-specific
+  setup.
 
 The existing latest/LTS kernel choices, display/input recovery profile and
 readable boot labels are preserved. The system lock is unchanged.
