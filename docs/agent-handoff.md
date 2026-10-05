@@ -50,9 +50,8 @@ the SDDM change):
   all-inclusive VM and exercised with the login rotation above.
 
 Screenshots: `.work/candidate-screens/` and `.work/timezone-screens/`.
-Next: commit and push both repositories (with permission), re-pin calamares,
-pure build, `nix flake check`, desktop and application matrices, evidence
-records, then update `.work/flash-sandisk-fast-install.command`.
+These changes are committed and pushed: calamares `1e14e4d`, pinned here. The
+final image built from them is described under "Candidate images".
 
 ## Where things are
 
@@ -74,25 +73,31 @@ Both repositories use the branch `claude/fast-install-hyprland`, created from
 
 `nix/calamares.nix` accepts `RESPIN_CALAMARES_SRC=/abs/checkout` with
 `--impure` for development builds. Pure builds use the pinned revision in
-`nix/calamares-source.json`: Calamares `cd054b949bb8fadec39f92530227c8b97fd6da99`
-on `claude/fast-install-hyprland`, pushed to GitHub. It follows `e825ac2` with
-only a storage-test ordering fix found by `nix flake check`. Both branches are pushed;
-neither is merged.
+`nix/calamares-source.json`: Calamares `1e14e4d448656b3b5f117dabd1c78b4ade2ca1bc`
+on `claude/fast-install-hyprland`, pushed to GitHub (the October 5 fixes on top
+of `cd054b9`). Both branches are pushed; neither is merged.
 
 ## Candidate images
 
 **Final image** (application cache plus all eight prebuilt desktops): a pure
-build of this repository at its pinned installer `cd054b9`, without overrides.
+build of this repository at its pinned installer `1e14e4d`, without overrides.
 `nixos-graphical-determinate-rust-26.11.20261001.c59305b-x86_64-linux.iso`,
-11,913,076,736 bytes, SHA-256
-`69d989e31b74465ff9ce076cb6116159497a8d960ba198832cb90507a5d174ed`.
+11,910,500,352 bytes, SHA-256
+`4f7621f035767d4ab78609d4b3ad724b457605af847ad593214fee004cf99cb1`.
 It is on the workstation at `~/work/dng/pure-iso/iso/` and on the Mac at
-`artifacts/fast-install/`.
+`artifacts/fast-install-oct5/`. `.work/flash-sandisk-fast-install.command`
+writes it to the SanDisk.
 - `nix flake check` passed, including the storage VM test.
 - 191 desktop and 34 application configurations passed.
-- A VM install was verified: 44.4 s from click to completion.
+- An all-inclusive VM install passed: Plasma, GNOME, Xfce, MATE, LXQt,
+  Hyprland and Omarchy with all 31 applications. It took 130.4 s from click to
+  completion for a 34.2 GB closure, while the configuration matrices ran on
+  the same host.
 - Evidence: `docs/test-results/fast-install-*.json` and
   `docs/test-results/application-configurations.json`.
+
+The previous final image, `69d989e3…` at installer `cd054b9`, is the one the
+user installed on the X1 Carbon. It remains in `artifacts/fast-install/`.
 
 `bce81f55…`, which carried the GUI screenshots and the other VM runs, differs
 from this image only by a storage-test ordering fix (test code). That fix
