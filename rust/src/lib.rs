@@ -17,6 +17,7 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
                 "ISO [--firmware bios|uefi] [--profile default|compatibility|lts] [--input usb|ps2]"
             }
             "qmp-input" => "RUN-NAME screenshot|key|type|click [VALUES]",
+            "guest-exec" => "RUN-NAME COMMAND",
             "wifi-test" => "ISO [--profile default|compatibility|lts]",
             "boot-installed" => "RUN-NAME",
             "check-config" => "template|settings FILE FILE",
@@ -42,6 +43,7 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
         "wifi-test" => wifi_test::main(args),
         "guest-wifi-test" => wifi_test::guest(),
         "qmp-input" => gui_input::main(args),
+        "guest-exec" => vm::guest_exec(args),
         "boot-installed" => vm::boot_installed(args),
         "check-config" => config::main(args),
         "check-selections" => {

@@ -45,7 +45,7 @@ Implemented in the installer's `rust/system/tuning.nix`, which is copied to
 | Kernel | `kernel.nmi_watchdog=0` plus the `nowatchdog` parameter; watchdog modules `iTCO_wdt`, `sp5100_tco` and `wdat_wdt` blacklisted; `kernel.kptr_restrict=2`; console log level 3; `ntsync` module loaded for Wine/Proton |
 | I/O | BFQ for rotating disks, Kyber for NVMe; SATA SSDs keep the kernel default, mq-deadline |
 | Network | `net.core.netdev_max_backlog=4096` |
-| Scheduling | ananicy-cpp with the CachyOS rule set (`ananicy-rules-cachyos`) |
+| Scheduling | ananicy-cpp with the CachyOS rule set (`ananicy-rules-cachyos`), adjusting nice, I/O and OOM priorities only. Its cgroup features are off: moving processes out of their systemd units broke VT switching and session cleanup at logout |
 | Memory pressure | systemd-oomd enabled for system and user slices |
 | systemd | `DefaultTimeoutStopSec=10s` for system and user managers; `DefaultLimitNOFILE` 2048:2097152 (system) and 1024:1048576 (user); `Delegate=cpu cpuset io memory pids` for user managers; journal capped at 50 MiB; coredumps cleaned after 3 days; rtkit logging at info |
 | Services already default in NixOS | weekly fstrim, dbus-broker, systemd initrd |

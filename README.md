@@ -16,6 +16,18 @@ MATE, LXQt, **vanilla Hyprland** and an **Omarchy-style Hyprland**, and choose
 the default login session. Plasma is preselected.
 GNOME and Cinnamon cannot be combined in this pinned NixOS version because
 their modules conflict on GSettings; the UI explains and validates this limit.
+
+Several desktops installed together share one login screen and user account.
+The configuration keeps them from interfering:
+
+- SDDM uses its X11 greeter. With the Wayland greeter that Plasma enables by
+  default, a login could stall for 30 seconds and leave a black screen
+  ([sddm#1443](https://github.com/sddm/sddm/issues/1443)).
+- Xfce's polkit-gnome agent starts only in Xfce.
+- GNOME's IBus autostart skips the Hyprland sessions.
+- The Omarchy session's dark GTK defaults apply only in that session.
+- ananicy-cpp never moves processes between cgroups. That had broken VT
+  switching and logout cleanup.
 You choose the hostname, normal user, password, full name, timezone, one of
 eight locales/keyboards, and whether to allow unfree packages (enabled by default).
 
@@ -58,13 +70,22 @@ user. No Ethernet/VPN profiles are copied. Keep the live wallet unlocked;
 missing credentials stop review. Enterprise networks using external certificate
 files or hardware tokens need manual configuration after installation.
 
-**Time-zone detection** first preserves a regional zone configured in the live
-session. If the live zone is unset/UTC, a bounded HTTPS request to ipapi.co
-suggests a zone from your public IP (the provider receives that IP). The UI
-explains the approximation, offers an internet opt-out and manual override,
-and requires confirmation. VPN/mobile routing can mislead IP geolocation.
-Failures do not default to US Eastern, and late responses cannot overwrite
-manual edits. US Central uses `America/Chicago`, including daylight saving.
+**Time zone** is chosen on a world map: click where you are, or search the
+list of cities. The page shows the zone's everyday name (for example "Central
+Time"), the city and country, the local time, the UTC offset and the IANA name.
+The installer preselects a zone from, in order:
+
+1. a regional zone already set in the live session;
+2. your public IP address, through geoip.kde.org and then ipinfo.io (they see
+   that IP; there is an opt-out, and VPNs or mobile networks can mislead them);
+3. the hardware clock, when it keeps local time as Windows sets it and NTP has
+   set the system clock; its offset selects the most populous zone with that
+   offset now;
+4. otherwise `America/New_York`.
+
+The page always says which of these applied. A click or list choice always wins
+over a later detection result. Map outlines are Natural Earth (public domain),
+names are Unicode CLDR; zones and positions come from the image's tzdata.
 
 Both the live and installed systems use Determinate Nix, Determinate Nixd and
 `fh`. The boot menu puts the kernel and session first so they remain visible on

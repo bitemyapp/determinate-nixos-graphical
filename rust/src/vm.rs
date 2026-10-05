@@ -800,6 +800,44 @@ pub fn main(args: Vec<String>) -> Result<()> {
     record(vm, &work, &artifacts, &mut result, outcome)
 }
 
+/// Run one shell command in a running test guest through its guest agent,
+/// printing its output and exiting with its status.
+pub fn guest_exec(args: Vec<String>) -> Result<()> {
+    ensure!(args.len() == 2, "Usage: guest-exec RUN-NAME COMMAND");
+    let name = &args[0];
+    ensure!(
+        Path::new(name).file_name().and_then(|n| n.to_str()) == Some(name)
+            && ![".", ".."].contains(&name.as_str()),
+        "Supply a run name, not a path"
+    );
+    let mut agent = Rpc::connect(
+        &repo()?.join(".work").join(name).join("qga.sock"),
+        false,
+        20,
+    )?;
+    agent.call("guest-ping", json!({}))?;
+    let pid = agent.call(
+        "guest-exec",
+        json!({"path":"/run/current-system/sw/bin/bash","arg":["-lc", &args[1]],"capture-output":true}),
+    )?["pid"]
+        .clone();
+    loop {
+        let status = agent.call("guest-exec-status", json!({"pid":pid}))?;
+        if status["exited"] == true {
+            for key in ["out-data", "err-data"] {
+                print!(
+                    "{}",
+                    String::from_utf8_lossy(&STANDARD.decode(status[key].as_str().unwrap_or(""))?)
+                );
+            }
+            let code = status["exitcode"].as_i64().unwrap_or(1);
+            ensure!(code == 0, "Guest command exited with status {code}");
+            return Ok(());
+        }
+        pause(Duration::from_millis(500))?;
+    }
+}
+
 pub fn boot_installed(args: Vec<String>) -> Result<()> {
     ensure!(args.len() == 1, "Usage: boot_installed.rs RUN-NAME");
     let name = &args[0];

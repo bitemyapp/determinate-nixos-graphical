@@ -1,6 +1,6 @@
 # Fast installation, tuning and Hyprland handoff
 
-Updated October 4, 2026, America/Chicago. The previous SanDisk/filesystem
+Updated October 5, 2026, America/Chicago. The previous SanDisk/filesystem
 handoff is archived at [archive/agent-handoff-sandisk-2026-10-04.md](archive/agent-handoff-sandisk-2026-10-04.md).
 
 ## User requirements for this round
@@ -17,6 +17,42 @@ handoff is archived at [archive/agent-handoff-sandisk-2026-10-04.md](archive/age
    `hyprland.lua` limited to declarative `hl.*` calls.
 6. Build, test and run VMs on `ssh wx-workstation`.
 7. Capture screenshots of potential final candidates for the user.
+
+## October 5 round: hardware feedback fixes (uncommitted)
+
+The user installed the final image on a ThinkPad X1 Carbon Gen 14 with every
+desktop except Cinnamon plus many applications. Their reports and the fixes:
+
+| Report | Cause | Fix |
+|---|---|---|
+| Ctrl+Alt+F*n* does nothing | ananicy-cpp's `cgroup_realtime_workaround` (forced on by nixpkgs) moved realtime compositors to the root cgroup; polkit then denied logind `Seat.SwitchTo` | calamares `rust/system/tuning.nix`: ananicy cgroup features off |
+| Plasma/GNOME failing or slow to start after switching desktops | SDDM's Wayland greeter (enabled by the Plasma module) races kwallet-pam when starting a session ([sddm#1443](https://github.com/sddm/sddm/issues/1443)): 30 s stall, then an inactive session on a black VT. Reproduced once in nine VM logins | `rust/system/desktops.nix`: `sddm.wayland.enable = false` (X11 greeter); eight further logins across Plasma, GNOME, Omarchy, Hyprland and MATE were all active at once |
+| Omarchy "not quite as nice as the official one" | — | Omarchy session conformed to Quattro (v4.0.4) with the Waybar/Walker/Mako stack and the Rust helper; see `docs/hyprland.md` |
+| Timezone should be a map with a sensible default | — | calamares `src/zonemap.rs`, `src/ui/zonemap.rs`, `src/timezone.rs`: clickable Natural Earth map, CLDR names, detection live → geoip.kde.org/ipinfo.io → hardware clock → New York. ipapi.co was rate-limiting (HTTP 429) |
+
+Also fixed: Xfce's polkit-gnome agent and GNOME's IBus autostart no longer
+start in other desktops, and Omarchy's dark GTK defaults are a dconf profile
+selected only in its session (`DCONF_PROFILE` through uwsm's `env-omarchy`).
+
+Verified on candidate `4c236fb0…` (impure build of both working trees, before
+the SDDM change):
+
+- All-inclusive install passed the harness: Plasma, GNOME, Xfce, MATE, LXQt,
+  Hyprland and Omarchy with all applications, 108 s from click to completion
+  for a 34.2 GB closure. That is VM disk-bound: 104 s copying.
+- GUI-driven install through the new Location page: detection by
+  geoip.kde.org, map clicks (London → BST, back to Chicago), and the installed
+  `time.timeZone = "America/Chicago"`. The harness check failed only because
+  my click on Btrfs missed, so it installed the default ext4 against
+  `--filesystem btrfs`.
+- VT switching to tty3 and back works in Plasma, GNOME and Omarchy.
+- The SDDM change was applied with `nixos-rebuild boot` in the installed
+  all-inclusive VM and exercised with the login rotation above.
+
+Screenshots: `.work/candidate-screens/` and `.work/timezone-screens/`.
+Next: commit and push both repositories (with permission), re-pin calamares,
+pure build, `nix flake check`, desktop and application matrices, evidence
+records, then update `.work/flash-sandisk-fast-install.command`.
 
 ## Where things are
 
