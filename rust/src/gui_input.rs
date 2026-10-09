@@ -23,6 +23,28 @@ fn codes(c: char) -> Result<Vec<String>> {
         '}' => ("bracket_right".into(), true),
         ':' => ("semicolon".into(), true),
         '@' => ("2".into(), true),
+        '#' => ("3".into(), true),
+        '%' => ("5".into(), true),
+        '^' => ("6".into(), true),
+        '&' => ("7".into(), true),
+        '*' => ("8".into(), true),
+        '(' => ("9".into(), true),
+        ')' => ("0".into(), true),
+        '=' => ("equal".into(), false),
+        '+' => ("equal".into(), true),
+        '[' => ("bracket_left".into(), false),
+        ']' => ("bracket_right".into(), false),
+        '\\' => ("backslash".into(), false),
+        '|' => ("backslash".into(), true),
+        ';' => ("semicolon".into(), false),
+        '\'' => ("apostrophe".into(), false),
+        '"' => ("apostrophe".into(), true),
+        ',' => ("comma".into(), false),
+        '<' => ("comma".into(), true),
+        '>' => ("dot".into(), true),
+        '?' => ("slash".into(), true),
+        '`' => ("grave_accent".into(), false),
+        '~' => ("grave_accent".into(), true),
         _ => bail!("Unsupported US-layout test character"),
     };
     Ok(if shift {
@@ -107,6 +129,10 @@ mod tests {
         assert_eq!(codes('!').unwrap(), ["shift", "1"]);
         assert_eq!(codes('A').unwrap(), ["shift", "a"]);
         assert_eq!(codes('{').unwrap(), ["shift", "bracket_left"]);
+        assert_eq!(codes('~').unwrap(), ["shift", "grave_accent"]);
+        assert_eq!(codes('\'').unwrap(), ["apostrophe"]);
+        // Every printable ASCII character can be typed.
+        assert!((' '..='~').all(|c| codes(c).is_ok()));
         assert!(codes('\n').is_err());
     }
 }

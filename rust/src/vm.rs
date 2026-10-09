@@ -430,7 +430,10 @@ pub(crate) fn fixture(repo: &Path) -> Result<String> {
     if let Some(local) = std::env::var_os("RESPIN_FIXTURE") {
         let dir = repo.join(".work/native-fixture/local/bin");
         fs::create_dir_all(&dir)?;
-        fs::copy(regular(Path::new(&local))?, dir.join("calamares-vm-fixture"))?;
+        fs::copy(
+            regular(Path::new(&local))?,
+            dir.join("calamares-vm-fixture"),
+        )?;
         return Ok("/workspace/.work/native-fixture/local/bin/calamares-vm-fixture".into());
     }
     let pin: Value = serde_json::from_slice(&fs::read(repo.join("nix/calamares-source.json"))?)?;
@@ -474,9 +477,10 @@ fn fixture_options() -> Result<String> {
         if let Ok(value) = std::env::var(name) {
             ensure!(
                 value.len() < 256
-                    && value
-                        .bytes()
-                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b',' || c == b'-'),
+                    && value.bytes().all(|c| c.is_ascii_lowercase()
+                        || c.is_ascii_digit()
+                        || c == b','
+                        || c == b'-'),
                 "Invalid {name}"
             );
             options.push_str(&format!("{name}={value} "));
@@ -492,7 +496,8 @@ fn timing(log: &str) -> Value {
     for line in log.lines() {
         if let Ok(event) = serde_json::from_str::<Value>(line)
             && event["kind"] == "timing"
-            && let (Some(stage), Some(seconds)) = (event["stage"].as_str(), event["seconds"].as_f64())
+            && let (Some(stage), Some(seconds)) =
+                (event["stage"].as_str(), event["seconds"].as_f64())
         {
             stages.insert(stage.into(), json!(seconds));
         } else if let Ok(event) = serde_json::from_str::<Value>(line)
@@ -562,8 +567,9 @@ fn verify_installed(
             "cinnamon" => "cinnamon-session",
             "mate" => "mate-session",
             "lxqt" => "lxqt-session",
-            // Both Hyprland flavors run the same compositor binary.
-            "hyprland" | "omarchy" => "Hyprland",
+            // Both Hyprland desktops run the same compositor binary. Images
+            // from before Tatami's rename report "omarchy".
+            "hyprland" | "tatami" | "omarchy" => "Hyprland",
             other => bail!("No login check for desktop session {other}"),
         };
         // Session managers can use a bare argv[0], a bin/libexec path, or a

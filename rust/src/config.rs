@@ -27,7 +27,7 @@ fn settings(text: &str, kernel: &str) -> Result<()> {
 }
 
 /// Inputs of the installed flake, which reuses this repository's lock.
-const TARGET_INPUTS: [&str; 7] = [
+const TARGET_INPUTS: [&str; 9] = [
     "nixpkgs",
     "determinate",
     "fh",
@@ -35,6 +35,8 @@ const TARGET_INPUTS: [&str; 7] = [
     "ai-apps",
     "omp",
     "calamares",
+    "tatami",
+    "yukimi",
 ];
 
 fn template(source: &str, lock: &str) -> Result<()> {
@@ -51,8 +53,7 @@ fn template(source: &str, lock: &str) -> Result<()> {
         .as_object()
         .ok_or_else(|| anyhow::anyhow!("Missing inputs"))?;
     ensure!(
-        inputs.keys().map(String::as_str).collect::<BTreeSet<_>>()
-            == BTreeSet::from(TARGET_INPUTS),
+        inputs.keys().map(String::as_str).collect::<BTreeSet<_>>() == BTreeSet::from(TARGET_INPUTS),
         "Unexpected target inputs"
     );
     for name in TARGET_INPUTS {

@@ -24,6 +24,8 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
             "check-config" => "template|settings FILE FILE",
             "check-selections" => "(inside the /workspace build environment)",
             "pin-calamares" => "REVISION",
+            "pin-tatami" => "REVISION",
+            "pin-yukimi" => "REVISION",
             _ => "(run only inside the disposable guest)",
         };
         println!("Usage: {command} {usage}");
@@ -48,7 +50,9 @@ pub fn dispatch(command: &str, args: Vec<String>) -> anyhow::Result<()> {
         "guest-exec" => vm::guest_exec(args),
         "boot-installed" => vm::boot_installed(args),
         "check-config" => config::main(args),
-        "pin-calamares" => pin::main(args),
+        "pin-calamares" => pin::main(&pin::CALAMARES, args),
+        "pin-tatami" => pin::main(&pin::TATAMI, args),
+        "pin-yukimi" => pin::main(&pin::YUKIMI, args),
         "check-selections" => {
             anyhow::ensure!(args.is_empty(), "Usage: check-selections");
             builder::check_selections()

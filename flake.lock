@@ -141,14 +141,20 @@
       "inputs": {
         "nixpkgs": [
           "nixpkgs"
+        ],
+        "tatami": [
+          "tatami"
+        ],
+        "yukimi": [
+          "yukimi"
         ]
       },
       "locked": {
-        "lastModified": 1791204025,
-        "narHash": "sha256-MdiENchBrvb1qEzJx6EIBGPqb9O4xtQqL4KCoOA4b8E=",
+        "lastModified": 1791570210,
+        "narHash": "sha256-X05ehtSUeKlu9nnJrrZrbdnRfNb9xGIZU3ZvIWcIEhg=",
         "owner": "bitemyapp",
         "repo": "calamares",
-        "rev": "0cbb39e2c42ab4b0a05690a7727dd69dea051545",
+        "rev": "52251cce5fc8657809b9d36d922173e92aec3361",
         "type": "github"
       },
       "original": {
@@ -604,7 +610,9 @@
         "determinate": "determinate",
         "fh": "fh",
         "nixpkgs": "nixpkgs_5",
-        "omp": "omp"
+        "omp": "omp",
+        "tatami": "tatami",
+        "yukimi": "yukimi"
       }
     },
     "rust-analyzer-src": {
@@ -690,6 +698,27 @@
         "type": "github"
       }
     },
+    "tatami": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791449124,
+        "narHash": "sha256-lKrbVD2A9jRbZ3zzyCSq9o+fquKzm/9g3ikr+PgTNMM=",
+        "owner": "bitemyapp",
+        "repo": "tatami",
+        "rev": "723c3ab5c029517dd7cd15f6234e295730c607c0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "bitemyapp",
+        "ref": "stable",
+        "repo": "tatami",
+        "type": "github"
+      }
+    },
     "treefmt-nix": {
       "inputs": {
         "nixpkgs": [
@@ -752,6 +781,27 @@
       "original": {
         "owner": "numtide",
         "repo": "treefmt-nix",
+        "type": "github"
+      }
+    },
+    "yukimi": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791569872,
+        "narHash": "sha256-ReJUWb1b4Wio1UFlyr1aLqpgysCmmG9LS09r07GItjk=",
+        "owner": "bitemyapp",
+        "repo": "yukimi",
+        "rev": "9f42aaad4ce43457b057b9a135ac130e53cf9457",
+        "type": "github"
+      },
+      "original": {
+        "owner": "bitemyapp",
+        "ref": "stable",
+        "repo": "yukimi",
         "type": "github"
       }
     }

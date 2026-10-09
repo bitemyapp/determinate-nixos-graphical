@@ -1,4 +1,4 @@
-# Hyprland and Omarchy-style Hyprland
+# Hyprland and Tatami
 
 The installer offers two Hyprland desktops. They can be installed together and
 alongside any other desktop. Both run Hyprland 0.56.2 from the pinned Nixpkgs
@@ -23,79 +23,25 @@ Users customize it by copying the file to `~/.config/hypr/hyprland.lua`.
 Upstream's example hard-codes the US keyboard layout; edit `kb_layout` there for
 other layouts.
 
-## Omarchy-style Hyprland (`omarchy` session)
+## Tatami (`tatami` session)
 
-The look, behavior and key bindings of [Omarchy](https://github.com/basecamp/omarchy)
-4.0.4 ("Quattro"; MIT, notice in `rust/system/omarchy/LICENSE`), adapted for
-NixOS without home-manager. Omarchy 4 draws its bar, menus, notifications,
-OSD and lock screen with a Quickshell (QML/JavaScript) shell driven by Bash.
-This desktop reproduces that design with Waybar, Walker, Mako, SwayOSD and
-hyprlock, styled to match, and replaces the scripts with Rust.
+Tatami is a keyboard-driven Hyprland desktop inspired by
+[Omarchy](https://github.com/basecamp/omarchy) 4.0.4 ("Quattro"). It is not
+Omarchy and is not affiliated with Omarchy or Basecamp. It has its own
+repository, [bitemyapp/tatami](https://github.com/bitemyapp/tatami), whose
+README describes it in full: components, the `tatami` helper, what was not
+ported, and how to use its NixOS module in any flake.
 
-| Component | Configuration |
-|---|---|
-| Look | Tokyo Night throughout, JetBrainsMono Nerd Font. Window gaps 5/10, a 2px `#7aa2f7` border, square corners, no blur or shadow, v4 animations, inactive windows at 0.985/0.96 opacity. NixOS artwork wallpaper, since Omarchy's wallpapers have unclear licenses |
-| Bar | Waybar, 26px. NixOS logo (menu), workspaces 1–5, a centered "Monday 10:23" clock with night-light, do-not-disturb and stay-awake indicators, then tray, Bluetooth, network, audio, display and battery |
-| Menu and launcher | Walker with Elephant. The v4 menu tree (Apps, Learn, Trigger, Setup, About, System) in v4's card style. Typing searches menu entries and applications together |
-| Notifications and OSD | Mako as v4's 380px accent-bordered cards; SwayOSD as v4's bottom card |
-| Lock and idle | hyprlock with PAM in v4's style; hypridle locks and turns off displays |
-| Terminal and tools | foot with v4's configuration, btop with the Tokyo Night theme, fastfetch, Nautilus, imv, mpv; Wi-Fi through `nmtui` because the installed system uses NetworkManager |
-| GTK applications | Dark Adwaita with Yaru icons, from a dconf profile selected only in this session |
-
-Configuration lives in `/etc/xdg/omarchy` and is used only by this session.
-The session puts that directory first in `XDG_CONFIG_DIRS` and starts Hyprland
-with `--config`, so vanilla Hyprland and other desktops are unaffected. Its
-components are systemd user units wanted by the session's own target, so they
-never start in Plasma or vanilla Hyprland. `hyprland.lua` contains only
-declarative `hl.config`, `hl.bind`, window rule and environment calls: v4's
-complete window rules and key bindings, minus Arch-specific ones. Both Shift
-keys together toggle Caps Lock. NixOS appends the installed keyboard layout,
-and non-Latin layouts follow `us`, switched with both Alt keys.
-
-Omarchy's Bash scripts are replaced by one Rust program, `omarchy`, built from
-source in the installed flake (it is prebuilt on the installation media). It
-provides:
-
-- the session launcher
-- the menu: system (lock, suspend, hibernate when swap exists, logout,
-  restart, shutdown), capture, toggles, hardware, display, audio, Wi-Fi,
-  Bluetooth and power profile
-- key binding help
-- copy and paste that works in terminals (Super+C/V/X)
-- window commands: pop out, tiled fullscreen, transparency, gaps, square
-  aspect, workspace layout. Gaps, aspect, layouts, display scaling and a
-  disabled touchpad are re-applied at login
-- monitor scaling, laptop display, touchpad and zoom toggles
-- time, battery and keyboard backlight notifications
-- a terminal in the active window's directory, editor and browser launch
-- volume, microphone, brightness and media keys with OSD
-- screenshots (freeze, region or window, copy, notify, Satty editing)
-- lock and wake, and logout, reboot and shutdown after closing windows
-
-Applications started from the menu, launcher or key bindings run in their own
-systemd scopes, so a memory-pressure kill of one cannot end the session.
-
-Not ported:
-
-- Arch package installation and updates, Limine/snapper, Plymouth theming and
-  the first-run script.
-- Theme, background and font switching, web apps, screen recording, OCR,
-  sharing, reminders, weather, dictation and AI agents.
-- The shell's drop-down panels: the bar opens terminal tools and menus instead.
-  There is no notification history panel.
+Installed systems get it through their `tatami` flake input (tracking
+Tatami's `stable` branch), which the installer's modules follow; choosing it
+in the installer sets `programs.tatami.enable`. `nix flake update tatami`
+brings its updates. Systems configured when it was called "omarchy", or with
+`calamares.tatami.enable`, keep working.
 
 ## Known limits
 
 - hyprlauncher crashed in GPU-less test VMs; check Super+R on real hardware.
 - Hibernate, brightness keys, Bluetooth, battery and nightlight were not
   exercised in VMs.
-- `programs.hyprland` always lists both `hyprland` and `hyprland-uwsm`
-  sessions on the login screen.
-- When Plasma is installed too, its kwallet-pam starts a `ksecretd` in every
-  login. GNOME and the uwsm-managed sessions never run the
-  `pam_kwallet_init` step that hands it the session, because that autostart
-  entry is marked `X-systemd-skip`. So after logout each such session stays
-  listed as "closing" with an idle `ksecretd`. With SDDM's X11 greeter this
-  no longer affects later logins.
 - In one of four VM boots Waybar showed no volume icon; the volume keys and
   OSD still worked.

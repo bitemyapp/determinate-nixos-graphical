@@ -36,11 +36,8 @@ in
         "plasma"
         "gnome"
         "xfce"
-        "cinnamon"
-        "mate"
-        "lxqt"
         "hyprland"
-        "omarchy"
+        "tatami"
       ];
       description = "Desktops whose complete installed systems are prebuilt on the media.";
     };
@@ -64,6 +61,33 @@ in
     };
     environment.plasma6.excludePackages = [ pkgs.kdePackages.plasma-workspace-wallpapers ];
     programs.kde-pim.enable = false;
+    # The live session never dims, blanks, locks or sleeps on its own, like
+    # Ubuntu's. Plasma's laptop defaults lock after 5 minutes, turn the screen
+    # off after 10 and sleep after 15 on AC (5 on battery): an unattended Acer
+    # with an NVIDIA GPU slept and never lit its screen again. While
+    # installing, the helper also holds a logind lock against sleep.
+    environment.etc."xdg/powerdevilrc".text =
+      lib.concatMapStrings
+        (profile: ''
+          [${profile}][Display]
+          DimDisplayWhenIdle=false
+          TurnOffDisplayWhenIdle=false
+          LockBeforeTurnOffDisplay=false
+
+          [${profile}][SuspendAndShutdown]
+          AutoSuspendAction=0
+
+        '')
+        [
+          "AC"
+          "Battery"
+          "LowBattery"
+        ];
+    environment.etc."xdg/kscreenlockerrc".text = ''
+      [Daemon]
+      Autolock=false
+      LockOnResume=false
+    '';
     environment.systemPackages = [
       inputs.fh.packages.${pkgs.stdenv.hostPlatform.system}.default
       calamares
@@ -119,6 +143,9 @@ in
       package = config.boot.kernelPackages.nvidiaPackages.latest;
       open = true;
       modesetting.enable = true;
+      # Suspend and resume through NVIDIA's services with video memory
+      # preserved, as installed systems do (calamares.nvidia).
+      powerManagement.enable = true;
     };
     nixpkgs.config.allowUnfree = true;
     services.libinput.enable = true;
@@ -156,7 +183,11 @@ in
     environment.etc."calamares-nixos/flake.lock".source = ../flake.lock;
     # The installed flake's `calamares` input is locked to this source: with
     # it in the live store, preparing an installation need not download it.
-    system.extraDependencies = [ inputs.calamares.outPath ];
+    system.extraDependencies = [
+      inputs.calamares.outPath
+      inputs.tatami.outPath
+      inputs.yukimi.outPath
+    ];
     environment.etc."calamares-nixos/settings.json".text = settings "latest";
     # Store path lists of the prebuilt reference systems and applications, read
     # by the installer to warm the page cache for the current selection.

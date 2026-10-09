@@ -5,31 +5,65 @@ An unofficial, x86_64 NixOS live ISO with KDE Plasma, Determinate Nix and a
 It uses the official NixOS graphical base, but **not** the upstream C++/Python
 Calamares engine. It is not endorsed by NixOS, Calamares or Determinate Systems.
 
-![The native Rust installer's welcome page in the live session](docs/images/candidate-welcome.png)
+![The installer's welcome page in the live Plasma session, with its nine steps from Welcome to Install](docs/images/tour/installer-welcome.png)
+
+[Screenshots of every step and of each installed desktop](#screenshots) are at
+the end of this page.
 
 ## Supported workflow
 
 The native installer supports guided **whole-disk erase**, GPT with ext4
 (default), Btrfs or XFS, UEFI with systemd-boot or legacy BIOS with GRUB. The default live desktop is Plasma, while the
-installer lets you select **one or more** of Plasma, GNOME, Xfce, Cinnamon,
-MATE, LXQt, **vanilla Hyprland** and an **Omarchy-style Hyprland**, and choose
-the default login session. Plasma is preselected.
-GNOME and Cinnamon cannot be combined in this pinned NixOS version because
-their modules conflict on GSettings; the UI explains and validates this limit.
+installer lets you select **one or more** of the Wayland desktops Plasma, GNOME,
+**vanilla Hyprland** and **Tatami** (a keyboard-driven Hyprland desktop inspired
+by Omarchy), and Xfce as the one traditional X11 desktop, and choose the
+default login session. Plasma is preselected. MATE, LXQt and Cinnamon are no
+longer offered: they duplicated Xfce's role and caused most of the
+interference between desktops. Systems installed with them keep working.
+
+Every desktop includes [Yukimi](https://github.com/bitemyapp/yukimi), an app
+for seeing what is installed and why, finding and installing packages,
+checking for and applying updates, returning to an earlier generation and
+cleaning up the store, without editing configuration.
 
 Several desktops installed together share one login screen and user account.
 The configuration keeps them from interfering:
 
-- SDDM uses its X11 greeter. With the Wayland greeter that Plasma enables by
-  default, a login could stall for 30 seconds and leave a black screen
+- The login screen is a Wayland one, which lights whichever GPU the displays
+  are on and also starts the X11 desktops. It is GDM whenever GNOME is
+  installed, because GNOME locks the screen only under GDM; otherwise it is
+  Plasma Login Manager, NixOS's default, given NixOS's X server arguments so
+  that Xfce has a keyboard and mouse. SDDM's X11 login screen needs a fixed GPU
+  layout and stayed black on a laptop whose panel is wired to its NVIDIA GPU.
+  SDDM's Wayland login screen sometimes stalled for 30 s
   ([sddm#1443](https://github.com/sddm/sddm/issues/1443)).
+- The login screen lists each chosen desktop once: no Plasma (X11), and no
+  Hyprland without uwsm, which starts no session services.
+- One keyring for every desktop: GNOME Keyring, unlocked at login. Plasma's
+  KWallet API stores into it, so passwords saved in one desktop are there in
+  the others.
 - Xfce's polkit-gnome agent starts only in Xfce.
 - GNOME's IBus autostart skips the Hyprland sessions.
-- The Omarchy session's dark GTK defaults apply only in that session.
+- Tatami's dark GTK defaults apply only in its session.
+- Each login through the login screen starts from the user manager's own
+  environment. Variables a desktop exported, such as an X11 desktop's
+  `QT_QPA_PLATFORM=xcb`, no longer reach the next desktop's services.
 - ananicy-cpp never moves processes between cgroups. That had broken VT
   switching and logout cleanup.
+
 You choose the hostname, normal user, password, full name, timezone, one of
 eight locales/keyboards, and whether to allow unfree packages (enabled by default).
+
+An optional **GitHub** step follows the account, as in Ubuntu's server
+installer. Give a GitHub username and the installer fetches the account's
+public SSH keys from `https://github.com/USER.keys`, shows their fingerprints,
+and adds the keys you allow to your account's authorized keys. The same page
+can install and enable the **SSH server** (it is not in the applications
+list): with keys authorized it accepts only them; without, it accepts your
+password. It also sets **Git's name and email** for your commits, filled in
+from your full name and the GitHub profile (its public address, or GitHub's
+private `ID+USER@users.noreply.github.com`), in `/etc/gitconfig`. All of it is
+written to `configuration.nix`, where it can be changed later.
 
 Two further choices are on by default and can be switched off on the Disk page:
 a **swap partition matched to installed RAM with zswap** (also used for
@@ -134,11 +168,14 @@ provide the optional application catalog:
 | AI applications | Numtide llm-agents.nix, `372f0337e8170e55ff0c017cd43ab73b02a062ad` |
 | oh-my-pi | Upstream release v18.6.1, `2a2c6dcbbb558c0f8145f67f28b3370984f2bf60` |
 | Rust installer and installed-system modules | Flake input `calamares` (`github:bitemyapp/calamares/stable`), locked to the revision in [nix/calamares-source.json](nix/calamares-source.json) |
+| Tatami desktop | Flake input `tatami` ([`github:bitemyapp/tatami/stable`](https://github.com/bitemyapp/tatami)), which `calamares` follows |
+| Yukimi | Flake input `yukimi` ([`github:bitemyapp/yukimi/stable`](https://github.com/bitemyapp/yukimi)), which `calamares` follows |
 
-The installed system's flake has the same seven inputs and reuses this lock
+The installed system's flake has the same nine inputs and reuses this lock
 verbatim, so it starts from exactly the tested revisions. Its desktop, swap,
-tuning, Hyprland, Omarchy and application modules come from the `calamares`
-input, not from copies in `/etc/nixos`. The installer writes the
+tuning, Hyprland and application modules come from the `calamares` input, the
+Tatami desktop from the `tatami` input and Yukimi from the `yukimi` input, not
+from copies in `/etc/nixos`. The installer writes the
 hostname-keyed flake and lock and generates
 hardware configuration with the normal NixOS tool (without filesystems, which it
 declares itself by identities chosen before formatting). It builds that exact
@@ -228,6 +265,28 @@ The default bootstrap hash is
 `80588c226d84e16fe11b2e4afa9fc4add02902e7041dcb220960df5a6cde5fb5`.
 For a different bootstrap image, pass `--sha256` with a separately verified
 hash; that changes the build environment, not the pinned output inputs.
+
+### Writing the image to a USB drive
+
+`scripts/flash_usb.rs` writes an image to a USB drive on macOS or Linux:
+
+```sh
+scripts/flash_usb.rs                     # pick an image (most recent first), then a drive
+scripts/flash_usb.rs path/to/image.iso   # or name the image
+scripts/flash_usb.rs --list              # every drive, and why each one is or isn't offered
+```
+
+It lists the drives that look like USB flash drives (`--all` adds other
+external drives) with their size, device, vendor, model and serial, and erases
+only the one you pick and confirm by typing its device name. Internal,
+virtual and read-only drives, the drive with the running system and the drive
+holding the image are never offered. The image's SHA-256 must match
+`--sha256` or a `SHA256SUMS` (or `<image>.sha256`) file beside it, when there
+is one. Only the writing runs through `sudo`: it checks that the drive is
+still the one you picked, unmounts it, writes the image, clears the drive's
+last MiB (where an old backup partition table would confuse firmware), reads
+every byte back and compares it, writes `<image>.flash.json` and ejects the
+drive.
 
 ## QEMU verification
 
@@ -356,12 +415,14 @@ The installed configuration is in `/etc/nixos/`. Rebuild with
 A hostname change does not automatically rename the flake output.
 Do not change `system.stateVersion` merely to upgrade packages.
 
-Installer fixes reach installed systems without a reinstall. The `calamares`
-input follows the installer's `stable` branch, which moves only to revisions
-verified in a complete image:
+Installer fixes reach installed systems without a reinstall. The `calamares`,
+`tatami` and `yukimi` inputs follow the `stable` branches of their
+repositories, which move only to revisions verified in a complete image.
+Yukimi's Updates page checks and applies them, and won't move an input to an
+older revision. From a terminal:
 
 ```sh
-sudo nix flake update calamares --flake /etc/nixos   # installer modules only
+sudo nix flake update calamares tatami yukimi --flake /etc/nixos   # desktop modules only
 sudo nix flake update --flake /etc/nixos             # or everything
 sudo nixos-rebuild boot --flake /etc/nixos           # then reboot
 ```
@@ -373,10 +434,12 @@ shows the one-time conversion.
 
 Branches: `stable` is what installed systems and release images use. The
 default branches (`codex/graphical-installer` here, `calamares` in the
-installer repository) carry reviewed, merged work ahead of it. To pin a new
-installer revision for an image, use
-`respin-tools pin-calamares REVISION`. It updates `nix/calamares-source.json`
-and the lock together, and `nix flake check` verifies that they agree.
+installer repository, `main` in Tatami's and Yukimi's) carry reviewed, merged
+work ahead of it. To pin new revisions for an image, use
+`respin-tools pin-tatami REVISION`, `respin-tools pin-yukimi REVISION` and
+`respin-tools pin-calamares REVISION`.
+The latter updates `nix/calamares-source.json` and the lock together, and
+`nix flake check` verifies that they agree.
 
 The password hash is in `/etc/nixos-secrets/user-password.hash` (root-only),
 referenced by `hashedPasswordFile`. Update/remove that declarative setting
@@ -386,3 +449,59 @@ ISOs, logs, private builder keys and virtual disks remain ignored under
 `artifacts/` and `.work/`. Publish source normally and large ISO/checksum files
 as separate release assets if desired. Integration code is Apache-2.0; upstream
 components retain their licenses. See [NOTICE](NOTICE).
+
+## Screenshots
+
+A QEMU installation from a development image of this branch on October 8,
+2026: 1280×800, all five desktops, the GitHub step with SSH server and Git.
+Installed in 1 minute 50 seconds.
+
+### The installer
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/tour/installer-disk.png" alt="Disk page: the disk to erase, the new partitions, filesystem, swap and tuning"><br>Choose the disk to erase; the new layout is previewed.</td>
+<td width="50%"><img src="docs/images/tour/installer-account.png" alt="Account page: full name, username, password and computer name"><br>Your account and the computer's name.</td>
+</tr>
+<tr>
+<td><img src="docs/images/tour/installer-github.png" alt="GitHub page: a GitHub username looked up, with the fingerprints of its public SSH keys"><br>GitHub: the account's public SSH keys, with their fingerprints.</td>
+<td><img src="docs/images/tour/installer-github-ssh-git.png" alt="GitHub page: the SSH server switch and Git's name and email"><br>The SSH server, for those keys only, and Git's name and email.</td>
+</tr>
+<tr>
+<td><img src="docs/images/tour/installer-desktops.png" alt="Desktop page: Plasma, GNOME, Xfce, Hyprland and Tatami selected"><br>One or more desktops, and the default session.</td>
+<td><img src="docs/images/tour/installer-applications.png" alt="Applications page: browsers and AI assistants with search"><br>Optional applications.</td>
+</tr>
+<tr>
+<td><img src="docs/images/tour/installer-location.png" alt="Location page: a world map with Chicago selected"><br>Time zone on a map, detected or clicked.</td>
+<td><img src="docs/images/tour/installer-review-github.png" alt="Review page: the account, location and GitHub, SSH and Git summary"><br>Review: everything chosen, including the GitHub step.</td>
+</tr>
+<tr>
+<td><img src="docs/images/tour/installer-review-ready.png" alt="Review page: erase confirmation and the system prepared in the background"><br>The system is built and cached while you confirm.</td>
+<td><img src="docs/images/tour/installer-installing.png" alt="Install page: partitioning and formatting done, copying the prepared system"><br>Installing: mostly copying the prepared system.</td>
+</tr>
+<tr>
+<td><img src="docs/images/tour/installer-done.png" alt="Installation complete in 1 minute 50 seconds"><br>Done.</td>
+<td></td>
+</tr>
+</table>
+
+### The installed desktops
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/tour/installed-login-sessions.png" alt="GDM with the session menu listing GNOME, Hyprland, Plasma, Tatami and Xfce"><br>One login screen for every desktop.</td>
+<td width="50%"><img src="docs/images/tour/installed-plasma.png" alt="KDE Plasma with Yukimi and Konsole running fastfetch"><br>KDE Plasma, with Yukimi.</td>
+</tr>
+<tr>
+<td><img src="docs/images/tour/installed-gnome.png" alt="GNOME's Activities overview with Yukimi and Console"><br>GNOME.</td>
+<td><img src="docs/images/tour/installed-xfce.png" alt="Xfce with Thunar and a terminal running fastfetch"><br>Xfce.</td>
+</tr>
+<tr>
+<td><img src="docs/images/tour/installed-hyprland.png" alt="Vanilla Hyprland with two tiled kitty terminals, fastfetch and btop"><br>Vanilla Hyprland.</td>
+<td><img src="docs/images/tour/installed-tatami.png" alt="Tatami with btop floating over a terminal running fastfetch"><br>Tatami.</td>
+</tr>
+<tr>
+<td><img src="docs/images/tour/installed-tatami-menu.png" alt="Tatami's menu: Apps, Learn, Trigger, Style, Setup, About and System"><br>Tatami's menu (Super+Space).</td>
+<td></td>
+</tr>
+</table>

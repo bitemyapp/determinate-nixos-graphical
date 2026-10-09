@@ -507,8 +507,8 @@ fn export_wifi_tools() -> Result<()> {
 }
 
 pub fn check_selections() -> Result<()> {
-    // Nonempty subsets of eight desktops, less those with both GNOME and Cinnamon.
-    check_configurations("desktop", 255 - 64, 8)?;
+    // Nonempty subsets of the five desktops the installer offers.
+    check_configurations("desktop", 31, 8)?;
     check_configurations("application", 34, 1)
 }
 
@@ -545,10 +545,7 @@ fn check_configurations(kind: &str, expected: usize, jobs: usize) -> Result<()> 
         );
         // The test expressions supply the modules from the `calamares` input
         // and their own filesystems in place of hardware detection.
-        let source = source.replace(
-            "imports = [ ./hardware-configuration.nix ];",
-            "",
-        );
+        let source = source.replace("imports = [ ./hardware-configuration.nix ];", "");
         let mut file = File::create(modules.join(format!("{name}.nix")))?;
         file.write_all(source.as_bytes())?;
         file.sync_all()?;

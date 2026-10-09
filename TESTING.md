@@ -1,7 +1,7 @@
 # Parsed-plan installer verification
 
 **Current work (fast installation, RAM-sized swap with zswap, CachyOS-inspired
-tuning, Hyprland and Omarchy-style Hyprland, libadwaita GUI):** results are in
+tuning, Hyprland and Tatami, libadwaita GUI):** results are in
 [fast installation](docs/fast-install.md), [Hyprland](docs/hyprland.md) and
 [tuning](docs/tuning.md). The sections below describe earlier images.
 

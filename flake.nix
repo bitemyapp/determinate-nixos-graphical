@@ -15,6 +15,20 @@
   inputs.calamares = {
     url = "github:bitemyapp/calamares/stable";
     inputs.nixpkgs.follows = "nixpkgs";
+    inputs.tatami.follows = "tatami";
+    inputs.yukimi.follows = "yukimi";
+  };
+  # The Tatami desktop, in its own repository. Installed systems track it the
+  # same way, so `nix flake update tatami` brings Tatami's fixes.
+  inputs.tatami = {
+    url = "github:bitemyapp/tatami/stable";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+  # Yukimi, the app for seeing and changing what is installed, likewise:
+  # `nix flake update yukimi` brings its fixes.
+  inputs.yukimi = {
+    url = "github:bitemyapp/yukimi/stable";
+    inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -102,11 +116,20 @@
               builtins.elem "nvidia" c.services.xserver.videoDrivers
               && builtins.elem "nouveau" c.boot.blacklistedKernelModules
               && c.hardware.nvidia.open
+              # Video memory survives sleep, as on installed systems.
+              && c.hardware.nvidia.powerManagement.enable
             )
             [
               normal
               lts
             ];
+          # The Plasma live session never sleeps, blanks or locks on its own.
+          assert pkgs.lib.hasInfix "[AC][SuspendAndShutdown]\nAutoSuspendAction=0"
+            etc."xdg/powerdevilrc".text;
+          assert pkgs.lib.hasInfix
+            "[Battery][Display]\nDimDisplayWhenIdle=false\nTurnOffDisplayWhenIdle=false"
+            etc."xdg/powerdevilrc".text;
+          assert pkgs.lib.hasInfix "Autolock=false" etc."xdg/kscreenlockerrc".text;
           assert !(builtins.elem "nvidia" recovery.services.xserver.videoDrivers);
           assert builtins.elem "nouveau" recovery.boot.blacklistedKernelModules;
           assert
@@ -164,6 +187,8 @@
                     desktops = [ "plasma" ];
                     inherit kernel;
                   })
+                  inputs.tatami.nixosModules.default
+                  inputs.yukimi.nixosModules.default
                   {
                     calamares.nvidia = {
                       enable = true;
