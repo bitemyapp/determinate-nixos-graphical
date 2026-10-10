@@ -37,7 +37,7 @@
         calamares.nixosModules.default
         ./configuration.nix
         ({ pkgs, ... }: {
-          environment.systemPackages = [ fh.packages.${pkgs.stdenv.hostPlatform.system}.default ];
+          environment.systemPackages = [ pkgs.file fh.packages.${pkgs.stdenv.hostPlatform.system}.default ];
         })
       ];
     };
