@@ -89,6 +89,7 @@ in
       LockOnResume=false
     '';
     environment.systemPackages = [
+      pkgs.file
       inputs.fh.packages.${pkgs.stdenv.hostPlatform.system}.default
       calamares
       diagnostics
